@@ -438,40 +438,155 @@ function TimePickerModal({ isOpen, onClose, onSave, personName, matchInfo }) {
   if (!isOpen) return null
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Registrera arbetstid</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+    <div 
+      className="modal-overlay" 
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '10px'
+      }}
+    >
+      <div 
+        className="modal-content" 
+        onClick={e => e.stopPropagation()}
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '15px',
+          width: '100%',
+          maxWidth: '400px',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          margin: '0 auto'
+        }}
+      >
+        <div 
+          className="modal-header"
+          style={{
+            backgroundColor: '#ef4444',
+            color: 'white',
+            padding: '20px',
+            borderRadius: '15px 15px 0 0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Registrera arbetstid</h2>
+          <button 
+            className="modal-close" 
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              fontSize: '24px',
+              cursor: 'pointer',
+              padding: '0',
+              width: '30px',
+              height: '30px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >×</button>
         </div>
 
-        <div className="modal-body">
-          <div className="worker-info">
-            <div className="info-card">
-              <strong>{personName}</strong>
+        <div className="modal-body" style={{ padding: '20px' }}>
+          <div 
+            className="worker-info"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '10px',
+              marginBottom: '20px'
+            }}
+          >
+            <div 
+              className="info-card"
+              style={{
+                backgroundColor: '#f8fafc',
+                padding: '15px',
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}
+            >
+              <strong style={{ fontSize: '18px', color: '#374151' }}>{personName}</strong>
             </div>
-            <div className="info-card">
-              <strong>{matchInfo.opponent}</strong>
+            <div 
+              className="info-card"
+              style={{
+                backgroundColor: '#f8fafc',
+                padding: '15px',
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}
+            >
+              <strong style={{ fontSize: '18px', color: '#374151' }}>{matchInfo.opponent}</strong>
             </div>
-            <div className="info-card">
-              <strong>{new Date(matchInfo.date).toLocaleDateString('sv-SE')}</strong>
-            </div>
-            <div className="info-card">
-              <strong>Match: {matchInfo.time}</strong>
+            <div 
+              className="info-card"
+              style={{
+                backgroundColor: '#f8fafc',
+                padding: '15px',
+                borderRadius: '8px',
+                textAlign: 'center',
+                gridColumn: '1 / -1'
+              }}
+            >
+              <div style={{ fontSize: '16px', color: '#374151' }}>
+                <strong>{new Date(matchInfo.date).toLocaleDateString('sv-SE')}</strong>
+                <br />
+                <span style={{ fontSize: '14px', color: '#6b7280' }}>Match: {matchInfo.time}</span>
+              </div>
             </div>
           </div>
 
-          <div className="standard-notice">
+          <div 
+            className="standard-notice"
+            style={{
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              padding: '15px',
+              marginBottom: '20px'
+            }}
+          >
             <div className="notice-box">
-              <strong>Standard: 4,5 timmar</strong>
-              <p>Start 2h före match • Slut 2,5h efter matchstart</p>
-              <p>Justera tiderna nedan om avvikelse behövs</p>
+              <strong style={{ color: '#dc2626', display: 'block', marginBottom: '8px' }}>Standard: 4,5 timmar</strong>
+              <p style={{ margin: '0', fontSize: '14px', color: '#7f1d1d' }}>Start 2h före match • Slut 2,5h efter matchstart</p>
+              <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#7f1d1d' }}>Justera tiderna nedan om avvikelse behövs</p>
             </div>
           </div>
 
-          <div className="time-inputs">
-            <div className="time-input-group">
-              <label htmlFor="start-time">Starttid</label>
+          <div 
+            className="time-inputs"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '15px',
+              marginBottom: '20px',
+              justifyContent: 'space-between'
+            }}
+          >
+            <div className="time-input-group" style={{ flex: 1 }}>
+              <label 
+                htmlFor="start-time"
+                style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  fontWeight: '500',
+                  color: '#374151'
+                }}
+              >Starttid</label>
               <div className="time-display">
                 <input
                   id="start-time"
@@ -479,15 +594,37 @@ function TimePickerModal({ isOpen, onClose, onSave, personName, matchInfo }) {
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
                   className="time-picker"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    textAlign: 'center'
+                  }}
                 />
-                <div className="time-label">{startTime}</div>
               </div>
             </div>
 
-            <div className="time-arrow">→</div>
+            <div 
+              className="time-arrow"
+              style={{
+                fontSize: '20px',
+                color: '#6b7280',
+                marginTop: '30px'
+              }}
+            >→</div>
 
-            <div className="time-input-group">
-              <label htmlFor="end-time">Sluttid</label>
+            <div className="time-input-group" style={{ flex: 1 }}>
+              <label 
+                htmlFor="end-time"
+                style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  fontWeight: '500',
+                  color: '#374151'
+                }}
+              >Sluttid</label>
               <div className="time-display">
                 <input
                   id="end-time"
@@ -495,42 +632,138 @@ function TimePickerModal({ isOpen, onClose, onSave, personName, matchInfo }) {
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
                   className="time-picker"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    textAlign: 'center'
+                  }}
                 />
-                <div className="time-label">{endTime}</div>
               </div>
             </div>
           </div>
 
-          <div className="calculated-hours">
-            <div className={`hours-display ${calculatedHours == 4.5 ? 'standard' : 'modified'}`}>
-              <span className="hours-number">{calculatedHours}</span>
-              <span className="hours-text">timmar</span>
+          <div 
+            className="calculated-hours"
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              marginBottom: '20px'
+            }}
+          >
+            <div 
+              className={`hours-display ${calculatedHours == 4.5 ? 'standard' : 'modified'}`}
+              style={{
+                backgroundColor: calculatedHours == 4.5 ? '#d1fae5' : '#fef3c7',
+                border: `2px solid ${calculatedHours == 4.5 ? '#10b981' : '#f59e0b'}`,
+                borderRadius: '12px',
+                padding: '20px',
+                textAlign: 'center',
+                minWidth: '120px'
+              }}
+            >
+              <span 
+                className="hours-number"
+                style={{
+                  fontSize: '32px',
+                  fontWeight: 'bold',
+                  color: calculatedHours == 4.5 ? '#047857' : '#d97706',
+                  display: 'block'
+                }}
+              >{calculatedHours}</span>
+              <span 
+                className="hours-text"
+                style={{
+                  fontSize: '14px',
+                  color: calculatedHours == 4.5 ? '#047857' : '#d97706',
+                  fontWeight: '500'
+                }}
+              >timmar</span>
               {calculatedHours != 4.5 && (
-                <div className="deviation-notice">Avviker från standard</div>
+                <div 
+                  className="deviation-notice"
+                  style={{
+                    fontSize: '12px',
+                    color: '#d97706',
+                    marginTop: '5px'
+                  }}
+                >Avviker från standard</div>
               )}
             </div>
           </div>
 
           <div className="notes-section">
-            <label htmlFor="notes">Anteckningar (valfritt)</label>
+            <label 
+              htmlFor="notes"
+              style={{
+                display: 'block',
+                marginBottom: '8px',
+                fontWeight: '500',
+                color: '#374151'
+              }}
+            >Anteckningar (valfritt)</label>
             <textarea
               id="notes"
               placeholder="T.ex. Övertid, paus, extratid..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows="3"
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontSize: '16px',
+                resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
             />
           </div>
         </div>
 
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>
+        <div 
+          className="modal-footer"
+          style={{
+            padding: '20px',
+            display: 'flex',
+            gap: '10px',
+            borderTop: '1px solid #e5e7eb'
+          }}
+        >
+          <button 
+            className="btn btn-secondary" 
+            onClick={onClose}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              backgroundColor: '#6b7280',
+              color: 'white'
+            }}
+          >
             Avbryt
           </button>
           <button 
             className="btn btn-primary" 
             onClick={handleSave}
             disabled={calculatedHours <= 0}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '500',
+              cursor: calculatedHours <= 0 ? 'not-allowed' : 'pointer',
+              backgroundColor: calculatedHours <= 0 ? '#9ca3af' : '#ef4444',
+              color: 'white'
+            }}
           >
             Spara {calculatedHours}h
           </button>
