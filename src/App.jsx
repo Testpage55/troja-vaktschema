@@ -1069,6 +1069,22 @@ function App() {
       if (existing) {
         const newWorkingStatus = !existing.is_working
         
+        // Om personen arbetar och ska tas bort - visa bekräftelse
+        if (existing.is_working && !newWorkingStatus) {
+          const confirmed = window.confirm(
+            `Är du säker på att du vill ta bort ${person.name} från match mot ${match.opponent}?\n\n` +
+            `Detta kommer att ta bort:\n` +
+            `• Arbetstilldelningen\n` +
+            `• Registrerade arbetstider\n\n` +
+            `Åtgärden kan inte ångras.`
+          )
+          
+          if (!confirmed) {
+            setSaving(false)
+            return // Avbryt om användaren inte bekräftar
+          }
+        }
+        
         await supabase
           .from('assignments')
           .update({ is_working: newWorkingStatus })
