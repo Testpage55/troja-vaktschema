@@ -1293,34 +1293,64 @@ function App() {
               const isExpanded = expandedMonths.has(monthGroup.monthKey)
               
               return (
-                <div key={monthGroup.monthKey} className="month-group">
+                <div key={monthGroup.monthKey} className="month-group" style={{
+                  backgroundColor: 'white',
+                  marginBottom: '20px',
+                  borderRadius: '10px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}>
                   <div 
                     className="month-header"
                     onClick={() => toggleMonth(monthGroup.monthKey)}
+                    style={{
+                      padding: '15px 20px',
+                      cursor: 'pointer',
+                      borderRadius: '10px 10px 0 0',
+                      backgroundColor: '#f8fafc',
+                      borderBottom: isExpanded ? '1px solid #e2e8f0' : 'none'
+                    }}
                   >
-                    <div className="month-title">
-                      <div className="month-expand-icon">
+                    <div className="month-title" style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <div className="month-expand-icon" style={{
+                        fontSize: '12px',
+                        color: '#6b7280'
+                      }}>
                         {isExpanded ? '▼' : '▶'}
                       </div>
-                      <h3>{monthGroup.monthName}</h3>
-                      <span className="match-count">({monthGroup.matches.length} matcher)</span>
+                      <h3 style={{ margin: 0, color: '#374151' }}>{monthGroup.monthName}</h3>
+                      <span className="match-count" style={{
+                        fontSize: '14px',
+                        color: '#6b7280'
+                      }}>({monthGroup.matches.length} matcher)</span>
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div className="month-content">
-                      <div className="table-container" style={{
-                        overflowX: 'auto',
-                        overflowY: 'visible',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        backgroundColor: 'white'
-                      }}>
-                        <table className="schedule-table" style={{
-                          minWidth: '100%',
-                          width: 'max-content',
-                          borderCollapse: 'collapse'
-                        }}>
+                    <div className="month-content" style={{ padding: '0' }}>
+                      <div 
+                        className="table-container" 
+                        style={{
+                          overflowX: 'auto',
+                          overflowY: 'visible',
+                          maxWidth: '100%',
+                          margin: '0',
+                          border: 'none',
+                          borderRadius: '0 0 10px 10px'
+                        }}
+                      >
+                        <table 
+                          className="schedule-table" 
+                          style={{
+                            width: '100%',
+                            minWidth: 'max-content',
+                            borderCollapse: 'collapse',
+                            backgroundColor: 'white'
+                          }}
+                        >
                           <thead>
                             <tr>
                               <th>Datum</th>
