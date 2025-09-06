@@ -1309,8 +1309,18 @@ function App() {
 
                   {isExpanded && (
                     <div className="month-content">
-                      <div className="table-container">
-                        <table className="schedule-table">
+                      <div className="table-container" style={{
+                        overflowX: 'auto',
+                        overflowY: 'visible',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        backgroundColor: 'white'
+                      }}>
+                        <table className="schedule-table" style={{
+                          minWidth: '100%',
+                          width: 'max-content',
+                          borderCollapse: 'collapse'
+                        }}>
                           <thead>
                             <tr>
                               <th>Datum</th>
