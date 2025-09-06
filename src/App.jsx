@@ -56,6 +56,140 @@ const calculateWorkTimes = (matchTime) => {
   }
 }
 
+// Confirm Modal Component
+function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText = "Ta bort", confirmButtonClass = "btn-danger" }) {
+  if (!isOpen) return null
+
+  return (
+    <div 
+      className="modal-overlay" 
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px'
+      }}
+    >
+      <div 
+        className="modal-content" 
+        onClick={e => e.stopPropagation()}
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '15px',
+          width: '100%',
+          maxWidth: '450px',
+          overflow: 'hidden',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+        }}
+      >
+        <div 
+          className="modal-header"
+          style={{
+            backgroundColor: '#fef2f2',
+            padding: '25px 30px 20px 30px',
+            borderBottom: '1px solid #fecaca'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              backgroundColor: '#fca5a5',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '24px'
+            }}>
+              ⚠️
+            </div>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                fontSize: '20px', 
+                fontWeight: 'bold', 
+                color: '#991b1b' 
+              }}>
+                {title}
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        <div 
+          className="modal-body" 
+          style={{ 
+            padding: '25px 30px',
+            color: '#374151',
+            lineHeight: '1.6'
+          }}
+        >
+          <div style={{ whiteSpace: 'pre-line', fontSize: '16px' }}>
+            {message}
+          </div>
+        </div>
+
+        <div 
+          className="modal-footer"
+          style={{
+            padding: '20px 30px 30px 30px',
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end'
+          }}
+        >
+          <button 
+            className="btn btn-secondary" 
+            onClick={onClose}
+            style={{
+              padding: '12px 24px',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              backgroundColor: '#f3f4f6',
+              color: '#374151',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#e5e7eb'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+          >
+            Avbryt
+          </button>
+          <button 
+            className={`btn ${confirmButtonClass}`}
+            onClick={onConfirm}
+            style={{
+              padding: '12px 24px',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              backgroundColor: '#dc2626',
+              color: 'white',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#b91c1c'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#dc2626'}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Security Duty Modal (för både lägg till och redigera)
 function SecurityDutyModal({ isOpen, onClose, onSave, duty = null }) {
   const [date, setDate] = useState('')
@@ -223,166 +357,6 @@ function SecurityDutyModal({ isOpen, onClose, onSave, duty = null }) {
             onClick={handleSave}
           >
             {isEditing ? 'Spara ändringar' : 'Lägg till uppdrag'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Add Match Modal
-function AddMatchModal({ isOpen, onClose, onSave }) {
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('19:00')
-  const [opponent, setOpponent] = useState('')
-  const [matchType, setMatchType] = useState('home')
-  const [distanceMiles, setDistanceMiles] = useState('')
-  const [requiredGuards, setRequiredGuards] = useState(4)
-
-  const resetForm = () => {
-    setDate('')
-    setTime('19:00')
-    setOpponent('')
-    setMatchType('home')
-    setDistanceMiles('')
-    setRequiredGuards(4)
-  }
-
-  const handleSave = () => {
-    if (!date || !time || !opponent.trim()) {
-      alert('Fyll i alla obligatoriska fält (datum, tid, motstånd)')
-      return
-    }
-
-    if (matchType === 'away' && (!distanceMiles || parseFloat(distanceMiles) <= 0)) {
-      alert('Ange antal mil för bortamatch')
-      return
-    }
-
-    const matchData = {
-      date,
-      time,
-      opponent: opponent.trim(),
-      match_type: matchType,
-      distance_miles: matchType === 'away' ? parseFloat(distanceMiles) : null,
-      required_guards: requiredGuards
-    }
-
-    onSave(matchData)
-    resetForm()
-    onClose()
-  }
-
-  if (!isOpen) return null
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content add-match-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Lägg till ny match</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-
-        <div className="modal-body">
-          <div className="form-grid">
-            <div className="form-group">
-              <label htmlFor="match-date">Datum *</label>
-              <input
-                id="match-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="form-input"
-                min={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="match-time">Tid *</label>
-              <input
-                id="match-time"
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="form-input"
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="opponent">Motstånd *</label>
-            <input
-              id="opponent"
-              type="text"
-              value={opponent}
-              onChange={(e) => setOpponent(e.target.value)}
-              className="form-input"
-              placeholder="t.ex. Växjö Lakers"
-            />
-          </div>
-
-          <div className="form-grid">
-            <div className="form-group">
-              <label htmlFor="match-type">Matchtyp</label>
-              <select
-                id="match-type"
-                value={matchType}
-                onChange={(e) => setMatchType(e.target.value)}
-                className="form-select"
-              >
-                <option value="home">Hemmamatch</option>
-                <option value="away">Bortamatch</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="required-guards">Antal vakter</label>
-              <input
-                id="required-guards"
-                type="number"
-                value={requiredGuards}
-                onChange={(e) => setRequiredGuards(parseInt(e.target.value) || 4)}
-                className="form-input"
-                min="1"
-                max="10"
-              />
-            </div>
-          </div>
-
-          {matchType === 'away' && (
-            <div className="form-group mileage-section">
-              <label htmlFor="distance">Avstånd (mil) *</label>
-              <input
-                id="distance"
-                type="number"
-                step="0.1"
-                value={distanceMiles}
-                onChange={(e) => setDistanceMiles(e.target.value)}
-                className="form-input"
-                placeholder="t.ex. 15.5"
-              />
-              <div className="mileage-info">
-                Milersättning: {MILEAGE_RATE} kr/mil per vakt
-                {distanceMiles && (
-                  <span className="mileage-preview">
-                    {' → '}
-                    {(parseFloat(distanceMiles) * MILEAGE_RATE * requiredGuards).toLocaleString('sv-SE')} kr totalt
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>
-            Avbryt
-          </button>
-          <button 
-            className="btn btn-primary" 
-            onClick={handleSave}
-          >
-            Lägg till match
           </button>
         </div>
       </div>
@@ -798,8 +772,9 @@ function App() {
   
   // Modal state
   const [isTimeModalOpen, setIsTimeModalOpen] = useState(false)
-  const [isAddMatchModalOpen, setIsAddMatchModalOpen] = useState(false)
   const [isSecurityDutyModalOpen, setIsSecurityDutyModalOpen] = useState(false)
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+  const [confirmModalData, setConfirmModalData] = useState(null)
   const [selectedMatch, setSelectedMatch] = useState(null)
   const [selectedPerson, setSelectedPerson] = useState(null)
   const [selectedSecurityDuty, setSelectedSecurityDuty] = useState(null)
@@ -828,6 +803,32 @@ function App() {
 
   const removeToast = (id) => {
     setToasts(prev => prev.filter(toast => toast.id !== id))
+  }
+
+  // Show confirm modal
+  const showConfirmModal = (title, message, onConfirm, confirmText = "Ta bort", confirmButtonClass = "btn-danger") => {
+    setConfirmModalData({
+      title,
+      message,
+      onConfirm,
+      confirmText,
+      confirmButtonClass
+    })
+    setIsConfirmModalOpen(true)
+  }
+
+  // Close confirm modal
+  const closeConfirmModal = () => {
+    setIsConfirmModalOpen(false)
+    setConfirmModalData(null)
+  }
+
+  // Handle confirm action
+  const handleConfirmAction = () => {
+    if (confirmModalData?.onConfirm) {
+      confirmModalData.onConfirm()
+    }
+    closeConfirmModal()
   }
 
   // FIXADE FUNKTIONER - dessa saknades i ursprungskoden
@@ -951,23 +952,30 @@ function App() {
 
   // Ta bort säkerhetsansvarig uppdrag
   const deleteSecurityDuty = async (dutyId, personnelName, opponent) => {
-    if (window.confirm(`Är du säker på att du vill ta bort säkerhetsansvarig uppdraget för ${personnelName} - ${opponent}?`)) {
-      setSaving(true)
-      try {
-        await supabase
-          .from('security_duties')
-          .delete()
-          .eq('id', dutyId)
-        
-        fetchData()
-        showToast(`Säkerhetsansvarig uppdrag borttaget`, 'info')
-      } catch (error) {
-        console.error('Error:', error)
-        showToast('Fel vid borttagning', 'error')
-      } finally {
-        setSaving(false)
-      }
-    }
+    const confirmMessage = `Vill du ta bort säkerhetsansvarig uppdraget?\n\nUppdrag: ${opponent}\nPerson: ${personnelName}\n\nÅtgärden kan inte ångras.`
+    
+    showConfirmModal(
+      "Ta bort säkerhetsansvarig uppdrag",
+      confirmMessage,
+      async () => {
+        setSaving(true)
+        try {
+          await supabase
+            .from('security_duties')
+            .delete()
+            .eq('id', dutyId)
+          
+          fetchData()
+          showToast(`Säkerhetsansvarig uppdrag borttaget`, 'info')
+        } catch (error) {
+          console.error('Error:', error)
+          showToast('Fel vid borttagning', 'error')
+        } finally {
+          setSaving(false)
+        }
+      },
+      "Ta bort uppdrag"
+    )
   }
 
   // Öppna modal för att lägga till nytt säkerhetsansvarig uppdrag
@@ -980,31 +988,6 @@ function App() {
   const openEditSecurityDutyModal = (duty) => {
     setSelectedSecurityDuty(duty)
     setIsSecurityDutyModalOpen(true)
-  }
-
-  // Lägg till ny match
-  const addMatch = async (matchData) => {
-    setSaving(true)
-    try {
-      await supabase
-        .from('matches')
-        .insert([{
-          date: matchData.date,
-          time: matchData.time,
-          opponent: matchData.opponent,
-          match_type: matchData.match_type,
-          distance_miles: matchData.distance_miles,
-          required_guards: matchData.required_guards
-        }])
-      
-      fetchData()
-      showToast(`Match mot ${matchData.opponent} har lagts till`, 'success')
-    } catch (error) {
-      console.error('Error:', error)
-      showToast('Fel vid tillägg av match', 'error')
-    } finally {
-      setSaving(false)
-    }
   }
 
   // Automatisk registrering av 4,5h arbetstid
@@ -1054,7 +1037,6 @@ function App() {
 
   // Toggle working med loading states och toast notifications
   const toggleWorking = async (matchId, personnelId) => {
-    setSaving(true)
     try {
       const { data: existing } = await supabase
         .from('assignments')
@@ -1071,20 +1053,35 @@ function App() {
         
         // Om personen arbetar och ska tas bort - visa bekräftelse
         if (existing.is_working && !newWorkingStatus) {
-          const confirmed = window.confirm(
-            `Är du säker på att du vill ta bort ${person.name} från match mot ${match.opponent}?\n\n` +
-            `Detta kommer att ta bort:\n` +
-            `• Arbetstilldelningen\n` +
-            `• Registrerade arbetstider\n\n` +
-            `Åtgärden kan inte ångras.`
-          )
+          const confirmMessage = `Vill du ta bort ${person.name} från match mot ${match.opponent}?\n\nDetta kommer att ta bort:\n• Arbetstilldelningen\n• Registrerade arbetstider\n\nÅtgärden kan inte ångras.`
           
-          if (!confirmed) {
-            setSaving(false)
-            return // Avbryt om användaren inte bekräftar
-          }
+          showConfirmModal(
+            "Ta bort vakt från match",
+            confirmMessage,
+            async () => {
+              setSaving(true)
+              try {
+                await supabase
+                  .from('assignments')
+                  .update({ is_working: false })
+                  .eq('id', existing.id)
+
+                await removeWorkHours(matchId, personnelId)
+                showToast(`${person.name} borttagen från match mot ${match.opponent}`, 'info')
+                fetchData()
+              } catch (error) {
+                console.error('Error:', error)
+                showToast('Ett fel uppstod vid uppdatering', 'error')
+              } finally {
+                setSaving(false)
+              }
+            },
+            "Ta bort vakt"
+          )
+          return
         }
         
+        setSaving(true)
         await supabase
           .from('assignments')
           .update({ is_working: newWorkingStatus })
@@ -1093,11 +1090,9 @@ function App() {
         if (newWorkingStatus) {
           await addAutomaticWorkHours(matchId, personnelId)
           showToast(`${person.name} tillagd för match mot ${match.opponent}`, 'success')
-        } else {
-          await removeWorkHours(matchId, personnelId)
-          showToast(`${person.name} borttagen från match mot ${match.opponent}`, 'info')
         }
       } else {
+        setSaving(true)
         await supabase
           .from('assignments')
           .insert([{
@@ -1255,21 +1250,28 @@ function App() {
   }
 
   const deletePersonnel = async (personnelId, name) => {
-    if (window.confirm(`Är du säker på att du vill ta bort ${name}?`)) {
-      setSaving(true)
-      try {
-        await supabase.from('assignments').delete().eq('personnel_id', personnelId)
-        await supabase.from('work_hours').delete().eq('personnel_id', personnelId)
-        await supabase.from('personnel').delete().eq('id', personnelId)
-        fetchData()
-        showToast(`${name} har tagits bort`, 'info')
-      } catch (error) {
-        console.error('Error:', error)
-        showToast('Fel vid borttagning', 'error')
-      } finally {
-        setSaving(false)
-      }
-    }
+    const confirmMessage = `Vill du ta bort ${name} permanent?\n\nDetta kommer att ta bort:\n• Personen från systemet\n• Alla arbetstilldelningar\n• Alla registrerade arbetstider\n\nÅtgärden kan inte ångras.`
+    
+    showConfirmModal(
+      "Ta bort personal",
+      confirmMessage,
+      async () => {
+        setSaving(true)
+        try {
+          await supabase.from('assignments').delete().eq('personnel_id', personnelId)
+          await supabase.from('work_hours').delete().eq('personnel_id', personnelId)
+          await supabase.from('personnel').delete().eq('id', personnelId)
+          fetchData()
+          showToast(`${name} har tagits bort`, 'info')
+        } catch (error) {
+          console.error('Error:', error)
+          showToast('Fel vid borttagning', 'error')
+        } finally {
+          setSaving(false)
+        }
+      },
+      "Ta bort person"
+    )
   }
 
   const getTotalHoursForPerson = (personnelId) => {
@@ -1528,13 +1530,6 @@ function App() {
                 <option value="away">Bortamatcher ({matches.filter(m => m.match_type === 'away').length})</option>
               </select>
             </div>
-            <button 
-              className="btn btn-success"
-              onClick={() => setIsAddMatchModalOpen(true)}
-              disabled={saving}
-            >
-              + Lägg till match
-            </button>
           </div>
 
           <div className="month-accordion">
@@ -2258,19 +2253,23 @@ function App() {
         matchInfo={selectedMatch || {}}
       />
 
-      {/* Add Match Modal */}
-      <AddMatchModal
-        isOpen={isAddMatchModalOpen}
-        onClose={() => setIsAddMatchModalOpen(false)}
-        onSave={addMatch}
-      />
-
       {/* Security Duty Modal (för både lägg till och redigera) */}
       <SecurityDutyModal
         isOpen={isSecurityDutyModalOpen}
         onClose={() => setIsSecurityDutyModalOpen(false)}
         onSave={saveSecurityDuty}
         duty={selectedSecurityDuty}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={isConfirmModalOpen}
+        onClose={closeConfirmModal}
+        onConfirm={handleConfirmAction}
+        title={confirmModalData?.title}
+        message={confirmModalData?.message}
+        confirmText={confirmModalData?.confirmText}
+        confirmButtonClass={confirmModalData?.confirmButtonClass}
       />
     </div>
   )
