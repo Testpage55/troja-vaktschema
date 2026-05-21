@@ -2,13 +2,12 @@ import { useState, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { HOURLY_RATE, MILEAGE_RATE } from '../../constants'
 
-export default function StatsTab({ matches, workHours, securityDuties, personnel, delegates }) {
-  const [seasonFilter, setSeasonFilter] = useState('all')
+export default function StatsTab({ matches, workHours, securityDuties, personnel, delegates, seasonFilter, setSeasonFilter, availableSeasons: availableSeasonsProp }) {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
 
-  const availableSeasons = [...new Set(matches.map(m => m.season).filter(Boolean))].sort()
+  const availableSeasons = availableSeasonsProp || [...new Set(matches.map(m => m.season).filter(Boolean))].sort()
   const availableCategories = [...new Set(matches.map(m => m.category).filter(Boolean))].sort()
 
   // Filtrera matcher

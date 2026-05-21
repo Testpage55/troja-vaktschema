@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAppData } from './hooks/useAppData'
+import { useAuth } from './hooks/useAuth'
 
+import LoginPage from './components/LoginPage'
 import ToastContainer from './components/ToastContainer'
 import ConfirmModal from './components/modals/ConfirmModal'
 import SecurityDutyModal from './components/modals/SecurityDutyModal'
@@ -15,8 +17,25 @@ import StatsTab from './components/tabs/StatsTab'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('schedule')
+  const auth = useAuth()
   const data = useAppData()
 
+  // Laddar auth
+  if (auth.loading) {
+    return (
+      <div className="loading">
+        <div className="loading-spinner"></div>
+        <h1>Laddar...</h1>
+      </div>
+    )
+  }
+
+  // Inte inloggad
+  if (!auth.user) {
+    return <LoginPage onLogin={auth.signIn} />
+  }
+
+  // Laddar admin-data
   if (data.loading) {
     return (
       <div className="loading">
@@ -43,6 +62,20 @@ export default function App() {
         </div>
         <div>
           <h1>Troja-Ljungby Vaktschema</h1>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => window.open('/vakt', '_blank')}
+            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px', color: 'white', padding: '8px 14px', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}
+          >
+            👤 Vaktvy
+          </button>
+          <button
+            onClick={auth.signOut}
+            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px', color: 'white', padding: '8px 14px', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}
+          >
+            Logga ut
+          </button>
         </div>
       </div>
 
@@ -89,6 +122,7 @@ export default function App() {
           calculateMileageForMatch={data.calculateMileageForMatch}
           toggleWorking={data.toggleWorking}
           openTimeModal={data.openTimeModal}
+          updateMatch={data.updateMatch}
           deleteMatch={data.deleteMatch}
           onAddMatch={() => data.setIsAddMatchModalOpen(true)}
           delegates={data.delegates}
@@ -106,6 +140,8 @@ export default function App() {
           workHours={data.workHours}
           securityDuties={data.securityDuties}
           availableSeasons={data.availableSeasons}
+          seasonFilter={data.seasonFilter}
+          setSeasonFilter={data.setSeasonFilter}
           getTotalHoursForPerson={data.getTotalHoursForPerson}
           getSecurityHoursForPerson={data.getSecurityHoursForPerson}
           getTotalAllHoursForPerson={data.getTotalAllHoursForPerson}
@@ -124,6 +160,9 @@ export default function App() {
           allWorkEntries={data.allWorkEntries}
           exportWorkHours={data.exportWorkHours}
           saving={data.saving}
+          seasonFilter={data.seasonFilter}
+          setSeasonFilter={data.setSeasonFilter}
+          availableSeasons={data.availableSeasons}
         />
       )}
 
@@ -134,6 +173,9 @@ export default function App() {
           openEditSecurityDutyModal={data.openEditSecurityDutyModal}
           deleteSecurityDuty={data.deleteSecurityDuty}
           saving={data.saving}
+          seasonFilter={data.seasonFilter}
+          setSeasonFilter={data.setSeasonFilter}
+          availableSeasons={data.availableSeasons}
         />
       )}
 
@@ -144,8 +186,12 @@ export default function App() {
           securityDuties={data.securityDuties}
           personnel={data.personnel}
           delegates={data.delegates}
+          seasonFilter={data.seasonFilter}
+          setSeasonFilter={data.setSeasonFilter}
+          availableSeasons={data.availableSeasons}
         />
       )}
+
 
       <AddMatchModal
         isOpen={data.isAddMatchModalOpen}

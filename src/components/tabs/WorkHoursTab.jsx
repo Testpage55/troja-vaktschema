@@ -35,12 +35,14 @@ function exportToCSV(entries, fromDate, toDate) {
   document.body.removeChild(link)
 }
 
-export default function WorkHoursTab({ workHours, securityDuties, allWorkEntries, saving }) {
+export default function WorkHoursTab({ workHours, securityDuties, allWorkEntries, saving, seasonFilter: seasonFilterProp, setSeasonFilter: setSeasonFilterProp, availableSeasons: availableSeasonsProp }) {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [personnelFilter, setPersonnelFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
-  const [seasonFilter, setSeasonFilter] = useState('all')
+  const [localSeasonFilter, setLocalSeasonFilter] = useState(seasonFilterProp || 'all')
+  const seasonFilter = seasonFilterProp !== undefined ? seasonFilterProp : localSeasonFilter
+  const setSeasonFilter = setSeasonFilterProp || setLocalSeasonFilter
 
   const allPersonnel = [...new Set([
     ...workHours.map(wh => wh.personnel?.name),

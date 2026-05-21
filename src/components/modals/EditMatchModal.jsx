@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 function timeToMinutes(t) {
   const [h, m] = t.split(':').map(Number)
@@ -12,22 +12,15 @@ function minutesToTime(mins) {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
 }
 
-function calcHours(start, end) {
-  if (!start || !end) return 0
-  let diff = timeToMinutes(end) - timeToMinutes(start)
-  if (diff <= 0) diff += 1440
-  return parseFloat((diff / 60).toFixed(1))
-}
-
 const CURRENT_YEAR = new Date().getFullYear()
 const DEFAULT_SEASONS = [
   `${CURRENT_YEAR}/${CURRENT_YEAR + 1}`,
   `${CURRENT_YEAR - 1}/${CURRENT_YEAR}`,
 ]
 
-export default function AddMatchModal({ isOpen, onClose, onSave, availableCategories, availableSeasons }) {
+export default function EditMatchModal({ isOpen, onClose, onSave, match, availableCategories = [], availableSeasons = [] }) {
   const [date, setDate] = useState('')
-  const [time, setTime] = useState('19:00')
+  const [matchTime, setMatchTime] = useState('19:00')
   const [opponent, setOpponent] = useState('')
   const [matchType, setMatchType] = useState('home')
   const [distanceMiles, setDistanceMiles] = useState('')
@@ -38,14 +31,26 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
   const [customSeason, setCustomSeason] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // time = matchstart i databasen
+  const getMatchTime = (m) => m?.time || '19:00'
+
+  useEffect(() => {
+    if (match) {
+      setDate(match.date || '')
+      setMatchTime(getMatchTime(match))
+      setOpponent(match.opponent || '')
+      setMatchType(match.match_type || 'home')
+      setDistanceMiles(match.distance_miles ? String(match.distance_miles) : '')
+      setRequiredGuards(String(match.required_guards || 4))
+      setCategory(match.category || 'Hockey')
+      setCustomCategory('')
+      setSeason(match.season || DEFAULT_SEASONS[0])
+      setCustomSeason('')
+    }
+  }, [match])
+
   const allCategories = [...new Set([...availableCategories, 'Hockey', 'Fotboll', 'Konsert', 'Övrigt'])]
   const allSeasons = [...new Set([...DEFAULT_SEASONS, ...availableSeasons])]
-
-  const reset = () => {
-    setDate(''); setTime('19:00'); setOpponent(''); setMatchType('home')
-    setDistanceMiles(''); setRequiredGuards('4'); setCategory('Hockey')
-    setCustomCategory(''); setSeason(DEFAULT_SEASONS[0]); setCustomSeason('')
-  }
 
   const handleSave = async () => {
     if (!date || !opponent.trim()) {
@@ -54,11 +59,13 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
     }
     const finalCategory = category === '__new__' ? customCategory.trim() : category
     const finalSeason = season === '__new__' ? customSeason.trim() : season
+    const guardStart = matchTime ? minutesToTime(timeToMinutes(matchTime) - 120) : null
 
     setSaving(true)
-    await onSave({
+    await onSave(match.id, {
       date,
-      time: time || null,
+      time: guardStart,
+      end_time: matchTime || null,
       opponent: opponent.trim(),
       match_type: matchType,
       distance_miles: matchType === 'away' && distanceMiles ? parseFloat(distanceMiles) : null,
@@ -67,7 +74,6 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
       season: finalSeason || null,
     })
     setSaving(false)
-    reset()
     onClose()
   }
 
@@ -81,7 +87,7 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
         style={{ maxWidth: '500px', width: '100%' }}
       >
         <div className="modal-header">
-          <h2>Lägg till evenemang</h2>
+          <h2>Redigera evenemang</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
@@ -103,13 +109,13 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
             <label>Matchens starttid</label>
             <input
               type="time"
-              value={time}
-              onChange={e => setTime(e.target.value)}
+              value={matchTime}
+              onChange={e => setMatchTime(e.target.value)}
               className="form-input"
             />
-            {time && (
+            {matchTime && (
               <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '6px' }}>
-                Vakterna börjar {minutesToTime(timeToMinutes(time) - 120)} (2h före match)
+                Vakterna börjar {minutesToTime(timeToMinutes(matchTime) - 120)} (2h före match)
               </div>
             )}
           </div>
@@ -123,9 +129,32 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
               onChange={e => setOpponent(e.target.value)}
               className="form-input"
               placeholder="t.ex. Frölunda HC eller Konsert XYZ"
-              autoFocus
             />
           </div>
+
+          {/* Hemma/Borta */}
+          <div className="form-group">
+            <label>Typ</label>
+            <select value={matchType} onChange={e => setMatchType(e.target.value)} className="form-select">
+              <option value="home">Hemma</option>
+              <option value="away">Borta</option>
+            </select>
+          </div>
+
+          {matchType === 'away' && (
+            <div className="form-group">
+              <label>Avstånd (mil)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={distanceMiles}
+                onChange={e => setDistanceMiles(e.target.value)}
+                className="form-input"
+                placeholder="t.ex. 5.5"
+              />
+            </div>
+          )}
 
           {/* Antal vakter */}
           <div className="form-group">
@@ -143,11 +172,7 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
           {/* Kategori */}
           <div className="form-group">
             <label>Kategori</label>
-            <select
-              value={category}
-              onChange={e => setCategory(e.target.value)}
-              className="form-select"
-            >
+            <select value={category} onChange={e => setCategory(e.target.value)} className="form-select">
               <option value="">Ingen kategori</option>
               {allCategories.map(c => (
                 <option key={c} value={c}>{c}</option>
@@ -170,11 +195,7 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
           {/* Säsong */}
           <div className="form-group">
             <label>Säsong</label>
-            <select
-              value={season}
-              onChange={e => setSeason(e.target.value)}
-              className="form-select"
-            >
+            <select value={season} onChange={e => setSeason(e.target.value)} className="form-select">
               {allSeasons.map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
@@ -202,7 +223,7 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
             onClick={handleSave}
             disabled={saving || !date || !opponent.trim()}
           >
-            {saving ? 'Sparar...' : 'Lägg till evenemang'}
+            {saving ? 'Sparar...' : 'Spara ändringar'}
           </button>
         </div>
       </div>

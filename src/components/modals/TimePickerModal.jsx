@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
-import { calculateWorkTimes } from '../../utils/timeUtils'
 
 function timeToMinutes(t) {
+  if (!t) return 0
   const [h, m] = t.split(':').map(Number)
   return h * 60 + m
 }
 
 function minutesToTime(mins) {
-  // Hantera dygnskifte
   const total = ((mins % 1440) + 1440) % 1440
   const h = Math.floor(total / 60)
   const m = total % 60
@@ -17,7 +16,7 @@ function minutesToTime(mins) {
 function calcHours(start, end) {
   if (!start || !end) return 0
   let diff = timeToMinutes(end) - timeToMinutes(start)
-  if (diff <= 0) diff += 1440 // nästa dygn
+  if (diff <= 0) diff += 1440
   return parseFloat((diff / 60).toFixed(1))
 }
 
@@ -26,47 +25,51 @@ export default function TimePickerModal({ isOpen, onClose, onSave, personName, m
   const [endTime, setEndTime] = useState('21:30')
   const [hoursInput, setHoursInput] = useState('4.5')
   const [notes, setNotes] = useState('')
-  const [lastChanged, setLastChanged] = useState('times') // 'times' | 'hours'
 
   useEffect(() => {
-    if (isOpen) {
-      if (matchInfo?.time) {
-        const { startTime: autoStart, endTime: autoEnd } = calculateWorkTimes(matchInfo.time)
-        setStartTime(autoStart)
-        setEndTime(autoEnd)
-        setHoursInput(String(calcHours(autoStart, autoEnd)))
+    if (!isOpen) return
+
+    const existing = matchInfo?.existingWorkHours
+
+    if (existing?.start_time && existing?.end_time) {
+      // Visa befintliga sparade tider
+      setStartTime(existing.start_time)
+      setEndTime(existing.end_time)
+      setHoursInput(String(calcHours(existing.start_time, existing.end_time)))
+      setNotes(existing.notes || '')
+    } else {
+      // Räkna ut från matchstart (match.time = matchstart i databasen)
+      const matchStart = matchInfo?.time
+      if (matchStart) {
+        const guardStart = minutesToTime(timeToMinutes(matchStart) - 120)  // 2h innan match
+        const guardEnd = minutesToTime(timeToMinutes(matchStart) + 150)    // 2.5h efter match
+        setStartTime(guardStart)
+        setEndTime(guardEnd)
+        setHoursInput(String(calcHours(guardStart, guardEnd)))
       } else {
         setStartTime('17:00')
         setEndTime('21:30')
         setHoursInput('4.5')
       }
-      setLastChanged('times')
       setNotes('')
     }
   }, [isOpen, matchInfo])
 
-  // När start eller sluttid ändras → räkna om timmar
   const handleStartChange = (val) => {
     setStartTime(val)
-    setLastChanged('times')
     if (val && endTime) setHoursInput(String(calcHours(val, endTime)))
   }
 
   const handleEndChange = (val) => {
     setEndTime(val)
-    setLastChanged('times')
     if (startTime && val) setHoursInput(String(calcHours(startTime, val)))
   }
 
-  // När timmar ändras → räkna ut sluttid
   const handleHoursChange = (val) => {
     setHoursInput(val)
-    setLastChanged('hours')
     const h = parseFloat(val)
     if (!isNaN(h) && h > 0 && startTime) {
-      const startMins = timeToMinutes(startTime)
-      const endMins = startMins + Math.round(h * 60)
-      setEndTime(minutesToTime(endMins))
+      setEndTime(minutesToTime(timeToMinutes(startTime) + Math.round(h * 60)))
     }
   }
 
@@ -125,7 +128,11 @@ export default function TimePickerModal({ isOpen, onClose, onSave, personName, m
             {matchInfo?.date && (
               <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', textAlign: 'center', gridColumn: '1 / -1' }}>
                 <strong>{new Date(matchInfo.date).toLocaleDateString('sv-SE')}</strong>
-                {matchInfo.time && <span style={{ fontSize: '14px', color: '#6b7280' }}> • {matchInfo.time}</span>}
+                {matchInfo.time && (
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                    {' • '}Match {matchInfo.time} • Vaktstart {minutesToTime(timeToMinutes(matchInfo.time) - 120)}
+                  </span>
+                )}
               </div>
             )}
           </div>

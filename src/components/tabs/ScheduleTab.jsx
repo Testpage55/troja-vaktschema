@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { SECURITY_RESPONSIBLE, REGULAR_GUARDS } from '../../constants'
+import EditMatchModal from '../modals/EditMatchModal'
 
 function PersonRow({ person, match, toggleWorking, saving }) {
   const isSecResp = match.security_responsible_id == person.id
@@ -188,7 +189,7 @@ function AddDelegateForm({ matchId, matchDate, delegates, onAdd, onDelete, savin
   )
 }
 
-function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, openTimeModal, saving, onClose, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible }) {
+function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, openTimeModal, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible }) {
   const [search, setSearch] = useState('')
   const matchType = match.match_type || 'home'
   const q = search.toLowerCase()
@@ -217,8 +218,8 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
         }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
-          <div style={{ width: '40px', height: '4px', background: 'var(--gray-200)', borderRadius: '99px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px 4px' }}>
+          <div style={{ width: '40px', height: '4px', background: 'var(--gray-200)', borderRadius: '99px', margin: '0 auto' }} />
         </div>
 
         <div style={{ padding: '12px 20px 16px', borderBottom: '1px solid var(--gray-100)' }}>
@@ -226,17 +227,27 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
             <div>
               <div style={{ fontSize: '11px', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                 {new Date(match.date).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
-                {' • '}{match.time}
+                {' • '}{match.end_time || match.time}{match.time && match.end_time ? ` • Vaktstart ${match.time}` : ''}
               </div>
               <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--gray-900)' }}>{match.opponent}</div>
             </div>
-            <span style={{
-              fontSize: '13px', fontWeight: '600', padding: '4px 10px', borderRadius: '99px',
-              background: allPersonnel.filter(p => isWorking(match, p.id)).length >= (match.required_guards || 4) ? '#dcfce7' : '#fee2e2',
-              color: allPersonnel.filter(p => isWorking(match, p.id)).length >= (match.required_guards || 4) ? '#15803d' : '#b91c1c'
-            }}>
-              {allPersonnel.filter(p => isWorking(match, p.id)).length}/{match.required_guards || 4}
-            </span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{
+                fontSize: '13px', fontWeight: '600', padding: '4px 10px', borderRadius: '99px',
+                background: allPersonnel.filter(p => isWorking(match, p.id)).length >= (match.required_guards || 4) ? '#dcfce7' : '#fee2e2',
+                color: allPersonnel.filter(p => isWorking(match, p.id)).length >= (match.required_guards || 4) ? '#15803d' : '#b91c1c'
+              }}>
+                {allPersonnel.filter(p => isWorking(match, p.id)).length}/{match.required_guards || 4}
+              </span>
+              <button onClick={onEdit} disabled={saving}
+                style={{ fontSize: '12px', padding: '5px 10px', border: '1px solid var(--gray-300)', borderRadius: '6px', background: 'white', color: 'var(--gray-700)', cursor: 'pointer' }}>
+                ✏️ Redigera
+              </button>
+              <button onClick={() => onDelete(match.id, match.opponent)} disabled={saving}
+                style={{ fontSize: '12px', padding: '5px 10px', border: '1px solid #fca5a5', borderRadius: '6px', background: 'white', color: '#b91c1c', cursor: 'pointer' }}>
+                🗑 Ta bort
+              </button>
+            </div>
           </div>
         </div>
 
@@ -412,7 +423,7 @@ function MatchCard({ match, allPersonnel, isWorking, getWorkHoursForMatch, hasDe
       </div>
 
       <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '10px' }}>
-        {match.time}{match.category ? ` • ${match.category}` : ''}
+        {match.end_time || match.time}{match.time && match.end_time ? ` • Vaktstart ${match.time}` : ''}{match.category ? ` • ${match.category}` : ''}
       </div>
 
       {/* Avatarer */}
@@ -464,11 +475,12 @@ export default function ScheduleTab({
   expandedMonths, toggleMonth, groupMatchesByMonth,
   isWorking, getWorkingCount, hasWorkHours, getWorkHoursForMatch,
   hasDeviatingHours, getDetailedTooltip, calculateMileageForMatch,
-  toggleWorking, openTimeModal, deleteMatch, onAddMatch,
+  toggleWorking, openTimeModal, updateMatch, deleteMatch, onAddMatch,
   delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible,
   saving
 }) {
   const [selectedMatch, setSelectedMatch] = useState(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const allPersonnel = [...regularPersonnel, ...extraPersonnel]
 
   const monthGroups = groupMatchesByMonth()
@@ -565,12 +577,23 @@ export default function ScheduleTab({
           openTimeModal={openTimeModal}
           saving={saving}
           onClose={() => setSelectedMatch(null)}
+          onEdit={() => setIsEditModalOpen(true)}
+          onDelete={deleteMatch}
           delegates={delegates}
           onAddDelegate={onAddDelegate}
           onDeleteDelegate={onDeleteDelegate}
           onUpdateSecurityResponsible={onUpdateSecurityResponsible}
         />
       )}
+
+      <EditMatchModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={async (id, data) => { await updateMatch(id, data); setIsEditModalOpen(false); setSelectedMatch(null) }}
+        match={selectedMatch}
+        availableCategories={availableCategories}
+        availableSeasons={availableSeasons}
+      />
     </div>
   )
 }

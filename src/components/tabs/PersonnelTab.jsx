@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { HOURLY_RATE } from '../../constants'
 
 function getInitials(name) {
@@ -116,7 +116,7 @@ function PersonDetailModal({ person, workHours, securityDuties, onClose, onExpor
             <option value="security">Säkerhetsansvarig</option>
           </select>
           {availableSeasons.length > 0 && (
-            <select value={seasonFilter} onChange={e => setSeasonFilter(e.target.value)} className="filter-select" style={{ fontSize: '13px' }}>
+            <select value={seasonFilter} onChange={e => handleSeasonChange(e.target.value)} className="filter-select" style={{ fontSize: '13px' }}>
               <option value="all">Alla säsonger</option>
               {availableSeasons.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -300,6 +300,20 @@ export default function PersonnelTab({
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('name')
   const [seasonFilter, setSeasonFilter] = useState('all')
+  useEffect(() => {
+    if (availableSeasons?.length > 0 && seasonFilter === 'all') {
+      const saved = localStorage.getItem('troja_default_season')
+      const current = (saved && availableSeasons.includes(saved))
+        ? saved
+        : availableSeasons.find(s => s.includes(String(new Date().getFullYear()))) || availableSeasons.sort().reverse()[0]
+      setSeasonFilter(current)
+    }
+  }, [availableSeasons])
+
+  const handleSeasonChange = (val) => {
+    setSeasonFilter(val)
+    if (val !== 'all') localStorage.setItem('troja_default_season', val)
+  }
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
 
@@ -344,6 +358,9 @@ export default function PersonnelTab({
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()))
     .filter(p => seasonFilter === 'all' || getPersonSeasons(p).includes(seasonFilter))
     .sort((a, b) => {
+      const aRegular = regularPersonnel.some(p => p.id === a.id)
+      const bRegular = regularPersonnel.some(p => p.id === b.id)
+      if (aRegular !== bRegular) return aRegular ? -1 : 1
       if (sortBy === 'hours') return getFilteredHours(b) - getFilteredHours(a)
       if (sortBy === 'shifts') return getShiftCount(b) - getShiftCount(a)
       if (sortBy === 'lastShift') return getLastShiftDate(b).localeCompare(getLastShiftDate(a))
@@ -377,7 +394,7 @@ export default function PersonnelTab({
           />
         </div>
         {availableSeasons.length > 0 && (
-          <select value={seasonFilter} onChange={e => setSeasonFilter(e.target.value)} className="filter-select">
+          <select value={seasonFilter} onChange={e => handleSeasonChange(e.target.value)} className="filter-select">
             <option value="all">Alla säsonger</option>
             {availableSeasons.map(s => <option key={s} value={s}>{s}</option>)}
           </select>

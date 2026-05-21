@@ -3,6 +3,12 @@ import { supabase } from '../lib/supabase'
 import { REGULAR_GUARDS, HOURLY_RATE, MILEAGE_RATE } from '../constants'
 import { calculateWorkTimes } from '../utils/timeUtils'
 
+function timeToMinutes(t) {
+  if (!t) return 0
+  const parts = t.split(':').map(Number)
+  return parts[0] * 60 + (parts[1] || 0)
+}
+
 export function useAppData() {
   const [matches, setMatches] = useState([])
   const [personnel, setPersonnel] = useState([])
@@ -25,7 +31,12 @@ export function useAppData() {
   const [toasts, setToasts] = useState([])
   const [matchFilter, setMatchFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [seasonFilter, setSeasonFilter] = useState('all')
+  const [seasonFilter, setSeasonFilter] = useState(() => localStorage.getItem('troja_default_season') || 'all')
+
+  const setSeasonFilterAndSave = (val) => {
+    setSeasonFilter(val)
+    if (val && val !== 'all') localStorage.setItem('troja_default_season', val)
+  }
 
   useEffect(() => { fetchData() }, [])
 
@@ -58,6 +69,27 @@ export function useAppData() {
         .select('*')
         .order('date', { ascending: false })
 
+      // Hämta matcher med säkerhetsansvarig och koppla till person
+      const matchesWithSecurity = (matchesData || []).filter(m => m.security_responsible_id)
+      const autoSecurityDuties = matchesWithSecurity.map(m => {
+        const person = personnelData?.find(p => p.id === m.security_responsible_id)
+        if (!person) return null
+        // Beräkna timmar från work_hours om de finns, annars standard 4.5h
+        const wh = hoursData?.find(h => h.match_id === m.id && h.personnel_id === m.security_responsible_id)
+        const hours = wh ? parseFloat(((timeToMinutes(wh.end_time) - timeToMinutes(wh.start_time) + 1440) % 1440 / 60).toFixed(1)) : 4.5
+        return {
+          id: `auto_${m.id}`,
+          date: m.date,
+          opponent: m.opponent,
+          personnel_name: person.name,
+          hours,
+          mileage_compensation: m.match_type === 'away' && m.distance_miles ? m.distance_miles * 2 * 25 : 0,
+          season: m.season,
+          notes: null,
+          auto: true,
+        }
+      }).filter(Boolean)
+
       const { data: delegatesData } = await supabase
         .from('delegates')
         .select('*')
@@ -74,7 +106,11 @@ export function useAppData() {
       setPersonnel(sortedPersonnel)
       setMatches(matchData || [])
       setWorkHours(hoursData || [])
-      setSecurityDuties(securityData || [])
+      const combined = [
+        ...(securityData || []).map(d => ({ ...d, auto: false })),
+        ...autoSecurityDuties
+      ].sort((a, b) => new Date(b.date) - new Date(a.date))
+      setSecurityDuties(combined)
       setDelegates(delegatesData || [])
     } catch (error) {
       console.error('Error:', error)
@@ -121,6 +157,20 @@ export function useAppData() {
     } catch (error) {
       console.error('Error:', error)
       showToast('Fel vid tillägg av match', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const updateMatch = async (matchId, matchData) => {
+    setSaving(true)
+    try {
+      await supabase.from('matches').update(matchData).eq('id', matchId)
+      fetchData()
+      showToast('Evenemang uppdaterat', 'success')
+    } catch (error) {
+      console.error('Error:', error)
+      showToast('Fel vid uppdatering', 'error')
     } finally {
       setSaving(false)
     }
@@ -220,7 +270,18 @@ export function useAppData() {
 
   // Unika kategorier och säsonger för filter
   const availableCategories = [...new Set(matches.map(m => m.category).filter(Boolean))]
-  const availableSeasons = [...new Set(matches.map(m => m.season).filter(Boolean))]
+  const availableSeasons = [...new Set(matches.map(m => m.season).filter(Boolean))].sort().reverse()
+
+  // Auto-set till aktuell säsong om inget är sparat
+  useEffect(() => {
+    if (availableSeasons.length > 0 && seasonFilter === 'all') {
+      const saved = localStorage.getItem('troja_default_season')
+      const season = (saved && availableSeasons.includes(saved))
+        ? saved
+        : availableSeasons.find(s => s.includes(String(new Date().getFullYear()))) || availableSeasons[0]
+      setSeasonFilter(season)
+    }
+  }, [availableSeasons.join(',')])
 
   // ─── Personnel helpers ────────────────────────────────────────────────────
 
@@ -307,8 +368,11 @@ export function useAppData() {
   // ─── Work time modal ──────────────────────────────────────────────────────
 
   const openTimeModal = (matchId, personnelId) => {
-    setSelectedMatch(matches.find(m => m.id === matchId))
-    setSelectedPerson(personnel.find(p => p.id === personnelId))
+    const match = matches.find(m => m.id === matchId)
+    const person = personnel.find(p => p.id === personnelId)
+    const existing = workHours.find(wh => wh.match_id === matchId && wh.personnel_id === personnelId)
+    setSelectedMatch({ ...match, existingWorkHours: existing || null })
+    setSelectedPerson(person)
     setIsTimeModalOpen(true)
   }
 
@@ -553,7 +617,7 @@ export function useAppData() {
     loading, saving,
     matchFilter, setMatchFilter,
     categoryFilter, setCategoryFilter,
-    seasonFilter, setSeasonFilter,
+    seasonFilter, setSeasonFilter: setSeasonFilterAndSave,
     availableCategories, availableSeasons,
     expandedMonths, toasts,
     isTimeModalOpen, setIsTimeModalOpen,
@@ -567,7 +631,7 @@ export function useAppData() {
     isWorking, getWorkingCount, hasWorkHours, getWorkHoursForMatch,
     hasDeviatingHours, getDetailedTooltip, calculateMileageForMatch,
     groupMatchesByMonth, toggleMonth,
-    addMatch, deleteMatch,
+    addMatch, updateMatch, deleteMatch,
     getTotalHoursForPerson, getSecurityHoursForPerson, getTotalAllHoursForPerson,
     addPersonnel, deletePersonnel,
     openTimeModal, saveWorkTime,
