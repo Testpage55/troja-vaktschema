@@ -32,8 +32,9 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
   const filteredSecurityDuties = useMemo(() => securityDuties.filter(d => {
     if (fromDate && d.date < fromDate) return false
     if (toDate && d.date > toDate) return false
+    if (seasonFilter !== 'all' && (d.season || '') !== seasonFilter) return false
     return true
-  }), [securityDuties, fromDate, toDate])
+  }), [securityDuties, fromDate, toDate, seasonFilter])
 
   const filteredDelegates = useMemo(() => (delegates || []).filter(d => {
     if (fromDate && d.date < fromDate) return false

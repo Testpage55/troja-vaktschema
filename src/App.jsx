@@ -168,6 +168,7 @@ export default function App() {
         onClose={() => data.setIsSecurityDutyModalOpen(false)}
         onSave={data.saveSecurityDuty}
         duty={data.selectedSecurityDuty}
+        availableSeasons={data.availableSeasons}
       />
 
       <ConfirmModal

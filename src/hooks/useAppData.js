@@ -370,14 +370,16 @@ export function useAppData() {
         await supabase.from('security_duties').update({
           date: securityData.date, opponent: securityData.opponent,
           personnel_name: securityData.personnel_name, hours: securityData.hours,
-          mileage_compensation: securityData.mileage_compensation, notes: securityData.notes
+          mileage_compensation: securityData.mileage_compensation, notes: securityData.notes,
+          season: securityData.season || null
         }).eq('id', securityData.id)
         showToast(`Uppdrag för ${securityData.personnel_name} uppdaterat`, 'success')
       } else {
         await supabase.from('security_duties').insert([{
           date: securityData.date, opponent: securityData.opponent,
           personnel_name: securityData.personnel_name, hours: securityData.hours,
-          mileage_compensation: securityData.mileage_compensation, notes: securityData.notes
+          mileage_compensation: securityData.mileage_compensation, notes: securityData.notes,
+          season: securityData.season || null
         }])
         showToast(`Uppdrag för ${securityData.personnel_name} tillagt`, 'success')
       }
