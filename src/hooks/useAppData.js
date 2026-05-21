@@ -70,7 +70,7 @@ export function useAppData() {
         .order('date', { ascending: false })
 
       // Hämta matcher med säkerhetsansvarig och koppla till person
-      const matchesWithSecurity = (matchesData || []).filter(m => m.security_responsible_id)
+      const matchesWithSecurity = (matchData || []).filter(m => m.security_responsible_id)
       const autoSecurityDuties = matchesWithSecurity.map(m => {
         const person = personnelData?.find(p => p.id === m.security_responsible_id)
         if (!person) return null
