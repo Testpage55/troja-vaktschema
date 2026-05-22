@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import '../guard.css'
-
+ 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
+ 
 function timeToMinutes(t) {
   if (!t) return 0
   const [h, m] = t.split(':').map(Number)
@@ -35,23 +35,23 @@ function fmtDate(dateStr, short = false) {
   if (short) return date.toLocaleDateString('sv-SE', { day:'numeric', month:'short' })
   return date.toLocaleDateString('sv-SE', { weekday:'long', day:'numeric', month:'long' })
 }
-
+ 
 // ─── NextMatch ────────────────────────────────────────────────────────────────
-
+ 
 function NextMatch({ personnelId }) {
   const [next, setNext] = useState(null)
   const [countdown, setCountdown] = useState('')
   const [loading, setLoading] = useState(true)
-
+ 
   useEffect(() => { fetchNext() }, [personnelId])
-
+ 
   useEffect(() => {
     if (!next) return
     const iv = setInterval(() => tickWith(next), 1000)
     tickWith(next)
     return () => clearInterval(iv)
   }, [next])
-
+ 
   const fetchNext = async () => {
     const today = new Date().toISOString().split('T')[0]
     const { data } = await supabase
@@ -63,7 +63,7 @@ function NextMatch({ personnelId }) {
     const upcoming = (data || [])
       .filter(a => a.matches?.date >= today)
       .sort((a,b) => new Date(a.matches.date) - new Date(b.matches.date))
-
+ 
     if (upcoming.length > 0) {
       const a = upcoming[0]
       const { data: wh } = await supabase
@@ -78,7 +78,7 @@ function NextMatch({ personnelId }) {
     }
     setLoading(false)
   }
-
+ 
   const tickWith = (n) => {
     if (!n?.match) return
     const wt = n.workHours?.start_time || (n.match.time ? minutesToTime(timeToMinutes(n.match.time)-120) : '17:00')
@@ -94,7 +94,7 @@ function NextMatch({ personnelId }) {
     else if (h > 0) setCountdown(`${h}h ${m}m ${s}s`)
     else setCountdown(`${m}m ${s}s`)
   }
-
+ 
   if (loading) return null
   if (!next) return (
     <div style={{ background:'rgba(255,255,255,0.95)', backdropFilter:'blur(20px)', padding:'24px', borderRadius:'24px', boxShadow:'var(--glass-shadow)', border:'1px solid var(--glass-border)', textAlign:'center', color:'#718096' }}>
@@ -102,10 +102,10 @@ function NextMatch({ personnelId }) {
       <p style={{ margin:0 }}>Inga kommande pass schemalagda</p>
     </div>
   )
-
+ 
   const guardStart = (next.workHours?.start_time || (next.match.time ? minutesToTime(timeToMinutes(next.match.time)-120) : null))?.slice(0,5)
   const guardEnd = next.workHours?.end_time || (next.match.time ? minutesToTime(timeToMinutes(next.match.time)+150) : null)
-
+ 
   return (
     <div style={{ background:'rgba(255,255,255,0.95)', backdropFilter:'blur(20px)', padding:'24px', borderRadius:'24px', boxShadow:'var(--glass-shadow)', border:'1px solid var(--glass-border)' }}>
       <h2 style={{ margin:'0 0 16px', fontSize:'18px', fontWeight:'700', color:'#1f2937' }}>Kommande arbetspass</h2>
@@ -127,16 +127,16 @@ function NextMatch({ personnelId }) {
     </div>
   )
 }
-
+ 
 // ─── MatchPersonnelModal ──────────────────────────────────────────────────────
-
+ 
 function MatchPersonnelModal({ match, onClose }) {
   const [personnel, setPersonnel] = useState([])
   const [securityId, setSecurityId] = useState(null)
   const [loading, setLoading] = useState(true)
-
+ 
   useEffect(() => { if (match) fetchPersonnel() }, [match])
-
+ 
   const fetchPersonnel = async () => {
     const [{ data: asgn }, { data: hours }, { data: matchData }] = await Promise.all([
       supabase.from('assignments').select('*, personnel(*)').eq('match_id', match.id).eq('is_working', true),
@@ -156,10 +156,33 @@ function MatchPersonnelModal({ match, onClose }) {
     setPersonnel(list)
     setLoading(false)
   }
-
+ 
   const guardStart = match?.time ? minutesToTime(timeToMinutes(match.time) - 120) : null
   const setCount = personnel.filter(p => p.workHours).length
-
+  const [attendance, setAttendance] = useState(null)
+  const [attendanceInput, setAttendanceInput] = useState('')
+  const [savingAttendance, setSavingAttendance] = useState(false)
+ 
+  useEffect(() => {
+    if (match?.id) {
+      supabase.from('matches').select('attendance').eq('id', match.id).single()
+        .then(({ data }) => {
+          setAttendance(data?.attendance || null)
+          setAttendanceInput(data?.attendance ? String(data.attendance) : '')
+        })
+    }
+  }, [match?.id])
+ 
+  const saveAttendance = async () => {
+    const val = parseInt(attendanceInput)
+    if (isNaN(val) || val < 0) return
+    setSavingAttendance(true)
+    await supabase.from('matches').update({ attendance: val }).eq('id', match.id)
+    setAttendance(val)
+    setAttendanceInput('')
+    setSavingAttendance(false)
+  }
+ 
   function getInitials(name) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   }
@@ -169,14 +192,14 @@ function MatchPersonnelModal({ match, onClose }) {
     const hue = Math.abs(hash) % 360
     return `hsl(${hue}, 65%, 45%)`
   }
-
+ 
   if (!match) return null
   return createPortal(
     <div className="time-registration-modal" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="time-registration-content" style={{ maxWidth: '480px' }}>
         <button className="close-button" onClick={onClose}>×</button>
         <div className="time-registration-inner">
-
+ 
           <div style={{ marginBottom: '20px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#ef4444', marginBottom: '6px' }}>Vakter</div>
             <h2 style={{ margin: '0 0 4px', fontSize: '22px', fontWeight: '800', color: '#1a202c', lineHeight: 1.2 }}>
@@ -188,7 +211,7 @@ function MatchPersonnelModal({ match, onClose }) {
               {guardStart && ` · Vaktstart ${guardStart}`}
             </p>
           </div>
-
+ 
           {!loading && personnel.length > 0 && (
             <div style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -208,7 +231,37 @@ function MatchPersonnelModal({ match, onClose }) {
               </div>
             </div>
           )}
-
+ 
+          {/* Publiksiffra */}
+          <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Publik</div>
+            {attendance !== null && attendanceInput === '' ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '18px', fontWeight: '700', color: '#1a202c' }}>{attendance.toLocaleString('sv-SE')} åskådare</span>
+                <button onClick={() => setAttendanceInput(String(attendance))} style={{ fontSize: '12px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Ändra</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min="0"
+                  value={attendanceInput}
+                  onChange={e => setAttendanceInput(e.target.value)}
+                  placeholder="Ange publiksiffra..."
+                  style={{ flex: 1, padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', outline: 'none' }}
+                  onKeyDown={e => e.key === 'Enter' && saveAttendance()}
+                />
+                <button
+                  onClick={saveAttendance}
+                  disabled={savingAttendance || !attendanceInput}
+                  style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', flexShrink: 0, opacity: !attendanceInput ? 0.5 : 1 }}
+                >
+                  {savingAttendance ? '...' : 'Spara'}
+                </button>
+              </div>
+            )}
+          </div>
+ 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#718096' }}>Laddar...</div>
           ) : personnel.length === 0 ? (
@@ -272,23 +325,39 @@ function MatchPersonnelModal({ match, onClose }) {
     document.body
   )
 }
-
+ 
 // ─── TimeModal ────────────────────────────────────────────────────────────────
-
+ 
 function TimeModal({ assignment, personnelId, onClose, onSave }) {
   const wh = assignment.workHours
   const matchTime = assignment.matches?.time
   const guardStart = matchTime ? minutesToTime(timeToMinutes(matchTime)-120) : '17:00'
   const guardEnd   = matchTime ? minutesToTime(timeToMinutes(matchTime)+150) : '21:30'
-
-  const [start, setStart] = useState(wh?.start_time || guardStart)
-  const [end,   setEnd]   = useState(wh?.end_time   || guardEnd)
+ 
+  const [start, setStart] = useState(wh?.start_time?.slice(0,5) || guardStart)
+  const [end,   setEnd]   = useState(wh?.end_time?.slice(0,5)   || guardEnd)
   const [notes, setNotes] = useState(wh?.notes || '')
   const [saving, setSaving] = useState(false)
-
+  const [attendance, setAttendance] = useState(null)
+  const [attendanceInput, setAttendanceInput] = useState('')
+ 
+  useEffect(() => {
+    supabase.from('matches').select('attendance').eq('id', assignment.match_id).single()
+      .then(({ data }) => {
+        setAttendance(data?.attendance || null)
+        setAttendanceInput(data?.attendance ? String(data.attendance) : '')
+      })
+  }, [assignment.match_id])
+ 
   const hours = calcHours(start, end)
   const isStandard = hours === 4.5
-
+ 
+  const adjustTime = (which, delta) => {
+    const current = which === 'start' ? start : end
+    const newTime = minutesToTime(timeToMinutes(current) + delta)
+    which === 'start' ? setStart(newTime) : setEnd(newTime)
+  }
+ 
   const handleSave = async () => {
     if (!start || !end) return
     setSaving(true)
@@ -296,57 +365,82 @@ function TimeModal({ assignment, personnelId, onClose, onSave }) {
       const payload = { match_id: assignment.match_id, personnel_id: personnelId, start_time: start, end_time: end, work_date: assignment.matches.date, notes: notes.trim()||null }
       if (wh?.id) await supabase.from('work_hours').update(payload).eq('id', wh.id)
       else await supabase.from('work_hours').insert([payload])
+      // Spara publik om ifyllt
+      if (attendanceInput) {
+        const val = parseInt(attendanceInput)
+        if (!isNaN(val) && val >= 0) {
+          await supabase.from('matches').update({ attendance: val }).eq('id', assignment.match_id)
+        }
+      }
       onSave()
     } catch { alert('Fel vid sparande') }
     finally { setSaving(false) }
   }
-
+ 
+  const adjBtn = { width:'44px', height:'44px', border:'none', borderRadius:'14px', background:'linear-gradient(135deg,#e02020,#b91c1c)', fontSize:'22px', fontWeight:'700', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'white', flexShrink:0, boxShadow:'0 3px 10px rgba(185,28,28,0.3)' }
+ 
   return (
     <div className="time-registration-modal" onClick={onClose}>
-      <div className="time-registration-content" onClick={e=>e.stopPropagation()}>
-        <button className="close-button" onClick={onClose}>×</button>
-        <div className="time-registration-inner">
-          <h3 style={{ margin:'0 0 8px', fontSize:'22px', fontWeight:'700', color:'#1f2937' }}>{wh?'Ändra arbetstider':'Sätt arbetstider'}</h3>
-
-          <div className="info-card" style={{ marginTop:'16px', marginBottom:'16px' }}>
-            <div className="info-card-content">
-              <h3>{assignment.matches?.opponent}</h3>
-              <p>{fmtDate(assignment.matches?.date)}</p>
-              {matchTime && <p>Match {matchTime} • Vaktstart {guardStart}</p>}
+      <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:'420px', background:'white', borderRadius:'28px', overflow:'hidden', boxShadow:'0 24px 60px rgba(0,0,0,0.25)', margin:'auto' }}>
+ 
+        {/* Header */}
+        <div style={{ background:'white', padding:'22px 22px 16px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'flex-start', gap:'14px', position:'relative' }}>
+          <div style={{ width:'44px', height:'44px', borderRadius:'12px', background:'#fef2f2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <img src="/images/troja-logo.png" alt="" style={{ width:'32px', height:'32px', objectFit:'contain' }} />
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:'10px', fontWeight:'800', letterSpacing:'0.12em', textTransform:'uppercase', color:'#e02020', marginBottom:'2px' }}>{wh ? 'Ändra arbetstider' : 'Sätt arbetstider'}</div>
+            <div style={{ fontSize:'17px', fontWeight:'800', color:'#111827', lineHeight:1.2 }}>{assignment.matches?.opponent}</div>
+            <div style={{ fontSize:'12px', color:'#9ca3af', marginTop:'3px' }}>
+              {fmtDate(assignment.matches?.date)}{matchTime && ` · Match ${matchTime} · Vaktstart ${guardStart}`}
             </div>
           </div>
-
-          {matchTime && (
-            <button className="btn btn-secondary btn-full" style={{ marginBottom:'16px' }} onClick={()=>{setStart(guardStart);setEnd(guardEnd)}}>
-              💡 Föreslagna tider ({guardStart}–{guardEnd})
-            </button>
-          )}
-
-          <div className="time-inputs">
-            <div className="form-group">
-              <label className="form-label">Starttid</label>
-              <input type="time" className="form-input" value={start} onChange={e=>setStart(e.target.value)} />
+          <button onClick={onClose} style={{ position:'absolute', top:'14px', right:'14px', width:'28px', height:'28px', borderRadius:'50%', background:'#f1f5f9', border:'none', fontSize:'16px', cursor:'pointer', color:'#6b7280', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+        </div>
+ 
+        {/* Body */}
+        <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:'14px', background:'#f9fafb' }}>
+ 
+          {/* Starttid + Sluttid */}
+          {[['start','Starttid',start,setStart],['end','Sluttid',end,setEnd]].map(([which,label,val,setter])=>(
+            <div key={which}>
+              <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'6px' }}>{label}</div>
+              <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                <button style={adjBtn} onClick={()=>adjustTime(which,-15)}>−</button>
+                <input type="time" value={val} onChange={e=>setter(e.target.value)}
+                  style={{ flex:1, height:'48px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'24px', fontWeight:'800', textAlign:'center', outline:'none', color:'#111827', background:'white', fontVariantNumeric:'tabular-nums' }} />
+                <button style={adjBtn} onClick={()=>adjustTime(which,15)}>+</button>
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Sluttid</label>
-              <input type="time" className="form-input" value={end} onChange={e=>setEnd(e.target.value)} />
-            </div>
+          ))}
+ 
+          {/* Totalt — kompakt */}
+          <div style={{ textAlign:'center', padding:'8px 0 0' }}>
+            <span style={{ fontSize:'15px', fontWeight:'700', color: isStandard ? '#059669' : '#d97706' }}>
+              {hours}h totalt{!isStandard && ' · Avviker från standard'}
+            </span>
           </div>
-
-          <div className="calculated-hours" style={{ background:isStandard?'#d1fae5':'#fef3c7', borderColor:isStandard?'#10b981':'#f59e0b' }}>
-            <h3 style={{ color:isStandard?'#065f46':'#92400e' }}>Totalt: {hours} timmar</h3>
-            {!isStandard && <div className="deviation">Avviker från standard (4.5h)</div>}
+ 
+          {/* Publik */}
+          <div>
+            <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'6px' }}>Publik (valfritt)</div>
+            <input type="number" min="0" value={attendanceInput} onChange={e=>setAttendanceInput(e.target.value)}
+              placeholder={attendance ? `Nuvarande: ${attendance.toLocaleString('sv-SE')}` : 'Antal åskådare...'}
+              style={{ width:'100%', height:'44px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'16px', fontWeight:'600', padding:'0 14px', outline:'none', color:'#111827', background:'white', boxSizing:'border-box' }} />
           </div>
-
-          <div className="form-group" style={{ marginTop:'16px' }}>
-            <label className="form-label">Anteckningar (valfritt)</label>
-            <textarea className="form-textarea" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="T.ex. övertid..." rows={2} />
+ 
+          {/* Anteckningar */}
+          <div>
+            <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'6px' }}>Anteckningar (valfritt)</div>
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="T.ex. övertid, paus..." rows={2}
+              style={{ width:'100%', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'14px', padding:'10px 14px', fontFamily:'inherit', resize:'none', outline:'none', color:'#111827', background:'white', boxSizing:'border-box' }} />
           </div>
-
-          <div style={{ display:'flex', gap:'12px', marginTop:'8px' }}>
-            <button className="btn btn-secondary" style={{ flex:1 }} onClick={onClose}>Avbryt</button>
-            <button className="btn btn-primary" style={{ flex:2 }} disabled={saving||!start||!end} onClick={handleSave}>
-              {saving?'Sparar...':wh?'Uppdatera':'Spara tider'}
+ 
+          {/* Knappar */}
+          <div style={{ display:'flex', gap:'10px', paddingTop:'2px' }}>
+            <button onClick={onClose} style={{ flex:1, height:'50px', background:'white', border:'2px solid #e5e7eb', borderRadius:'16px', fontSize:'15px', fontWeight:'600', cursor:'pointer', color:'#374151' }}>Avbryt</button>
+            <button onClick={handleSave} disabled={saving||!start||!end} style={{ flex:2, height:'50px', background:saving?'#d1d5db':'linear-gradient(135deg,#e02020,#b91c1c)', border:'none', borderRadius:'16px', fontSize:'15px', fontWeight:'700', cursor:saving?'not-allowed':'pointer', color:'white', boxShadow:'0 4px 16px rgba(185,28,28,0.35)' }}>
+              {saving ? 'Sparar...' : wh ? 'Uppdatera' : 'Spara tider'}
             </button>
           </div>
         </div>
@@ -354,18 +448,18 @@ function TimeModal({ assignment, personnelId, onClose, onSave }) {
     </div>
   )
 }
-
+ 
 // ─── MyHours ─────────────────────────────────────────────────────────────────
-
+ 
 function MyHours({ personnelId }) {
   const [allHours, setAllHours] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAll, setShowAll] = useState(false)
   const [seasonFilter, setSeasonFilter] = useState(null)
   const [availableSeasons, setAvailableSeasons] = useState([])
-
+ 
   useEffect(() => { fetchHours() }, [personnelId])
-
+ 
   const fetchHours = async () => {
     const [{ data }, { data: activeAssignments }] = await Promise.all([
       supabase.from('work_hours').select('*, matches(date,opponent,time,match_type,season)').eq('personnel_id', personnelId).order('work_date', { ascending: false }),
@@ -379,11 +473,11 @@ function MyHours({ personnelId }) {
     setAllHours(all)
     setLoading(false)
   }
-
+ 
   const hours = allHours.filter(wh => !seasonFilter || wh.matches?.season === seasonFilter)
   const totalHours = hours.reduce((s,wh) => s + (parseFloat(wh.total_hours)||calcHours(wh.start_time,wh.end_time)), 0)
   const shown = showAll ? hours : hours.slice(0,5)
-
+ 
   return (
     <div style={{ background:'rgba(255,255,255,0.95)', backdropFilter:'blur(20px)', padding:'24px', borderRadius:'24px', boxShadow:'var(--glass-shadow)', border:'1px solid var(--glass-border)' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
@@ -401,7 +495,7 @@ function MyHours({ personnelId }) {
           ))}
         </div>
       )}
-
+ 
       {loading ? (
         <div style={{ textAlign:'center', padding:'32px', color:'#6b7280' }}>Laddar...</div>
       ) : hours.length === 0 ? (
@@ -439,29 +533,25 @@ function MyHours({ personnelId }) {
     </div>
   )
 }
-
+ 
 // ─── AssignedMatches ──────────────────────────────────────────────────────────
-
-function AssignedMatches({ assignments, seasonFilter, setSeasonFilter, availableSeasons, onEditTimes }) {
+ 
+function AssignedMatches({ assignments, onEditTimes }) {
   const [selectedMatch, setSelectedMatch] = useState(null)
   const [showAll, setShowAll] = useState(false)
-
+ 
   const today = new Date(); today.setHours(0,0,0,0)
-  const currentSeason = availableSeasons[0] || null
-
+ 
   const filtered = assignments
     .filter(a => {
       if (!a.matches?.date) return false
-      if (seasonFilter === 'current') {
-        const d = new Date(a.matches.date); d.setHours(0,0,0,0)
-        return d >= today || a.matches.season === currentSeason
-      }
-      return a.matches.season === seasonFilter
+      const d = new Date(a.matches.date); d.setHours(0,0,0,0)
+      return d >= today
     })
     .sort((a,b) => new Date(a.matches.date)-new Date(b.matches.date))
-
+ 
   const shown = showAll ? filtered : filtered.slice(0,3)
-
+ 
   return (
     <div style={{ background:'rgba(255,255,255,0.95)', backdropFilter:'blur(20px)', padding:'24px', borderRadius:'24px', boxShadow:'var(--glass-shadow)', border:'1px solid var(--glass-border)' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
@@ -472,15 +562,9 @@ function AssignedMatches({ assignments, seasonFilter, setSeasonFilter, available
           </div>
         )}
       </div>
-
-      <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'16px' }}>
-        {[{key:'current',label:'Aktuellt'}, ...availableSeasons.map(s=>({key:s,label:s}))].map(f=>(
-          <button key={f.key} onClick={()=>setSeasonFilter(f.key)} style={{ padding:'7px 16px', borderRadius:'99px', fontSize:'13px', fontWeight:'600', border:'none', cursor:'pointer', minHeight:'40px', background:seasonFilter===f.key?'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)':'white', color:seasonFilter===f.key?'white':'#4a5568', boxShadow:seasonFilter===f.key?'var(--shadow-primary)':'var(--shadow-sm)' }}>
-            {f.label}
-          </button>
-        ))}
-      </div>
-
+ 
+ 
+ 
       {filtered.length === 0 ? (
         <div style={{ textAlign:'center', padding:'40px', color:'#6b7280', background:'#f8fafc', borderRadius:'16px', border:'2px dashed #cbd5e0' }}>
           <div style={{ fontWeight:'600', color:'#374151', marginBottom:'8px' }}>Inga kommande matcher</div>
@@ -494,7 +578,7 @@ function AssignedMatches({ assignments, seasonFilter, setSeasonFilter, available
             const d = new Date(match.date); d.setHours(0,0,0,0)
             const isPast = d < today
             const guardStart = match.time ? minutesToTime(timeToMinutes(match.time)-120) : null
-
+ 
             return (
               <div key={a.id} style={{ border:'1px solid #e5e7eb', borderRadius:'16px', padding:'20px', background:'white', opacity:isPast?0.75:1 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'12px' }}>
@@ -508,8 +592,9 @@ function AssignedMatches({ assignments, seasonFilter, setSeasonFilter, available
                       {fmtDate(match.date)} • Match {match.time||'TBA'}{guardStart&&` • Vaktstart ${guardStart}`} • {match.match_type==='away'?'Borta':'Hemma'}
                     </div>
                     {wh ? (
-                      <div style={{ background:'#d1fae5', border:'1px solid #10b981', padding:'8px 12px', borderRadius:'8px', fontSize:'13px', color:'#065f46', fontWeight:'500' }}>
-                        ✓ Arbetstider: {fmtTime(wh.start_time)} – {fmtTime(wh.end_time)} ({calcHours(wh.start_time,wh.end_time)}h)
+                      <div style={{ background:'#d1fae5', border:'1px solid #10b981', padding:'8px 12px', borderRadius:'8px', fontSize:'13px', color:'#065f46', fontWeight:'500', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <span>✓ Arbetstider: {fmtTime(wh.start_time)} – {fmtTime(wh.end_time)} ({calcHours(wh.start_time,wh.end_time)}h)</span>
+                        {match.attendance && <span style={{ color:'#374151', fontWeight:'600' }}>👥 {match.attendance.toLocaleString('sv-SE')}</span>}
                       </div>
                     ) : !isPast && (
                       <div style={{ background:'#fef3c7', border:'1px solid #f59e0b', padding:'6px 12px', borderRadius:'8px', fontSize:'12px', color:'#92400e', fontWeight:'500' }}>
@@ -528,42 +613,42 @@ function AssignedMatches({ assignments, seasonFilter, setSeasonFilter, available
           })}
         </div>
       )}
-
+ 
       {selectedMatch && <MatchPersonnelModal match={selectedMatch} onClose={()=>setSelectedMatch(null)} />}
     </div>
   )
 }
-
+ 
 // ─── GuardApp (main) ──────────────────────────────────────────────────────────
-
+ 
 export default function GuardApp({ personnelId, personnelName, onSignOut, embedded = false }) {
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
   const [seasonFilter, setSeasonFilter] = useState('current')
   const [availableSeasons, setAvailableSeasons] = useState([])
   const [editingAssignment, setEditingAssignment] = useState(null)
-
+ 
   useEffect(() => { if (personnelId) fetchAssignments() }, [personnelId])
-
+ 
   const fetchAssignments = async () => {
     setLoading(true)
     const { data } = await supabase
       .from('assignments')
-      .select('*, matches(id,date,time,opponent,match_type,season,required_guards)')
+      .select('*, matches(id,date,time,opponent,match_type,season,required_guards,attendance)')
       .eq('personnel_id', personnelId)
       .eq('is_working', true)
-
+ 
     const withHours = await Promise.all((data||[]).map(async a => {
       const { data: wh } = await supabase.from('work_hours').select('*').eq('match_id', a.match_id).eq('personnel_id', personnelId).single()
       return { ...a, workHours: wh||null }
     }))
-
+ 
     const seasons = [...new Set(withHours.map(a=>a.matches?.season).filter(Boolean))].sort().reverse()
     setAvailableSeasons(seasons)
     setAssignments(withHours)
     setLoading(false)
   }
-
+ 
   if (loading) return (
     <div style={{ minHeight:embedded?'200px':'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)' }}>
       <div style={{ textAlign:'center', background:'rgba(255,255,255,0.1)', padding:'40px', borderRadius:'24px', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.2)' }}>
@@ -572,7 +657,7 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, embedd
       </div>
     </div>
   )
-
+ 
   return (
     <div className="app" style={{ background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)', minHeight:'100vh' }}>
       <div className="dashboard">
@@ -588,20 +673,17 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, embedd
             <button className="logout-btn" onClick={onSignOut}>Logga ut</button>
           )}
         </div>
-
+ 
         <div className="dashboard-content">
           <NextMatch personnelId={personnelId} />
           <AssignedMatches
             assignments={assignments}
-            seasonFilter={seasonFilter}
-            setSeasonFilter={setSeasonFilter}
-            availableSeasons={availableSeasons}
             onEditTimes={setEditingAssignment}
           />
           <MyHours personnelId={personnelId} />
         </div>
       </div>
-
+ 
       {editingAssignment && (
         <TimeModal
           assignment={editingAssignment}
@@ -610,7 +692,7 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, embedd
           onSave={()=>{ setEditingAssignment(null); fetchAssignments() }}
         />
       )}
-
+ 
       <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
     </div>
   )
