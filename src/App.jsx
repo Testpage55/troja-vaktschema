@@ -36,8 +36,24 @@ export default function App() {
     return <LoginPage onLogin={auth.signIn} />
   }
 
+  // Profil saknas — visa felmeddelande
+  if (!auth.profile) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6' }}>
+        <div style={{ background: 'white', borderRadius: '16px', padding: '40px', maxWidth: '400px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+          <div style={{ fontSize: '40px', marginBottom: '16px' }}>⚠️</div>
+          <h2 style={{ margin: '0 0 8px', color: '#1f2937' }}>Inget konto kopplat</h2>
+          <p style={{ color: '#6b7280', margin: '0 0 24px' }}>Ditt konto är inte kopplat till en vakt. Kontakta administratören.</p>
+          <button onClick={auth.signOut} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', padding: '12px 24px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
+            Logga ut
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Inloggad som vakt — skicka till vaktvy
-  if (auth.profile && !auth.isAdmin) {
+  if (!auth.isAdmin) {
     return (
       <GuardApp
         personnelId={auth.personnelId}
@@ -76,16 +92,19 @@ export default function App() {
         <div>
           <h1>Troja-Ljungby Vaktschema</h1>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: '#6b7280', fontSize: '13px', whiteSpace: 'nowrap' }}>
+            Inloggad som <strong style={{ color: '#1f2937' }}>{auth.personnelName || auth.user?.email}</strong>
+          </span>
           <button
             onClick={() => window.open('/vakt', '_blank')}
-            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px', color: 'white', padding: '8px 14px', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}
+            style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#374151', padding: '8px 14px', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}
           >
             👤 Vaktvy
           </button>
           <button
             onClick={auth.signOut}
-            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px', color: 'white', padding: '8px 14px', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}
+            style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#b91c1c', padding: '8px 14px', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}
           >
             Logga ut
           </button>

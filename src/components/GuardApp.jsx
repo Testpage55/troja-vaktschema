@@ -66,7 +66,6 @@ function NextMatch({ personnelId }) {
 
     if (upcoming.length > 0) {
       const a = upcoming[0]
-      // Hämta arbetstider separat
       const { data: wh } = await supabase
         .from('work_hours')
         .select('*')
@@ -178,7 +177,6 @@ function MatchPersonnelModal({ match, onClose }) {
         <button className="close-button" onClick={onClose}>×</button>
         <div className="time-registration-inner">
 
-          {/* Rubrik */}
           <div style={{ marginBottom: '20px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#ef4444', marginBottom: '6px' }}>Vakter</div>
             <h2 style={{ margin: '0 0 4px', fontSize: '22px', fontWeight: '800', color: '#1a202c', lineHeight: 1.2 }}>
@@ -191,7 +189,6 @@ function MatchPersonnelModal({ match, onClose }) {
             </p>
           </div>
 
-          {/* Progressbar */}
           {!loading && personnel.length > 0 && (
             <div style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -212,7 +209,6 @@ function MatchPersonnelModal({ match, onClose }) {
             </div>
           )}
 
-          {/* Personnellista */}
           {loading ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#718096' }}>Laddar...</div>
           ) : personnel.length === 0 ? (
@@ -232,7 +228,6 @@ function MatchPersonnelModal({ match, onClose }) {
                     border: `1.5px solid ${wh ? '#bbf7d0' : '#fde68a'}`,
                     boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
                   }}>
-                    {/* Avatar */}
                     <div style={{
                       width: '38px', height: '38px', borderRadius: '50%',
                       background: avatarColor(p.name), color: 'white',
@@ -241,8 +236,6 @@ function MatchPersonnelModal({ match, onClose }) {
                     }}>
                       {getInitials(p.name)}
                     </div>
-
-                    {/* Namn + tider */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontWeight: '700', fontSize: '15px', color: '#1a202c' }}>{p.name}</span>
@@ -264,8 +257,6 @@ function MatchPersonnelModal({ match, onClose }) {
                         <div style={{ fontSize: '12px', color: '#d97706', fontWeight: '500', marginTop: '1px' }}>Tider ej registrerade</div>
                       )}
                     </div>
-
-                    {/* Status */}
                     <div style={{
                       width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
                       background: wh ? '#10b981' : '#f59e0b'
@@ -482,7 +473,6 @@ function AssignedMatches({ assignments, seasonFilter, setSeasonFilter, available
         )}
       </div>
 
-      {/* Säsongsfilter */}
       <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'16px' }}>
         {[{key:'current',label:'Aktuellt'}, ...availableSeasons.map(s=>({key:s,label:s}))].map(f=>(
           <button key={f.key} onClick={()=>setSeasonFilter(f.key)} style={{ padding:'7px 16px', borderRadius:'99px', fontSize:'13px', fontWeight:'600', border:'none', cursor:'pointer', minHeight:'40px', background:seasonFilter===f.key?'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)':'white', color:seasonFilter===f.key?'white':'#4a5568', boxShadow:seasonFilter===f.key?'var(--shadow-primary)':'var(--shadow-sm)' }}>
@@ -586,7 +576,6 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, embedd
   return (
     <div className="app" style={{ background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)', minHeight:'100vh' }}>
       <div className="dashboard">
-        {/* Header */}
         <div className="dashboard-header">
           <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
             <img src="/images/troja-logo.png" alt="Troja" style={{ height:'48px' }} />
@@ -595,7 +584,7 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, embedd
               <p style={{ margin:0, fontSize:'14px', color:'#718096' }}>Översikt för kommande uppdrag</p>
             </div>
           </div>
-          {!embedded && onSignOut && (
+          {onSignOut && (
             <button className="logout-btn" onClick={onSignOut}>Logga ut</button>
           )}
         </div>
