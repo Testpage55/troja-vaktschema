@@ -3,6 +3,7 @@ import { useAppData } from './hooks/useAppData'
 import { useAuth } from './hooks/useAuth'
 
 import LoginPage from './components/LoginPage'
+import GuardApp from './components/GuardApp'
 import ToastContainer from './components/ToastContainer'
 import ConfirmModal from './components/modals/ConfirmModal'
 import SecurityDutyModal from './components/modals/SecurityDutyModal'
@@ -33,6 +34,18 @@ export default function App() {
   // Inte inloggad
   if (!auth.user) {
     return <LoginPage onLogin={auth.signIn} />
+  }
+
+  // Inloggad som vakt — skicka till vaktvy
+  if (auth.profile && !auth.isAdmin) {
+    return (
+      <GuardApp
+        personnelId={auth.personnelId}
+        personnelName={auth.personnelName}
+        onSignOut={auth.signOut}
+        embedded={false}
+      />
+    )
   }
 
   // Laddar admin-data
