@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { SECURITY_RESPONSIBLE, REGULAR_GUARDS } from '../../constants'
 import EditMatchModal from '../modals/EditMatchModal'
+import { supabase } from '../../lib/supabase'
 
 function PersonRow({ person, match, toggleWorking, saving }) {
   const isSecResp = match.security_responsible_id == person.id
@@ -190,6 +191,59 @@ function AddDelegateForm({ matchId, matchDate, delegates, onAdd, onDelete, savin
   )
 }
 
+function AttendanceInline({ match }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(match.attendance ? String(match.attendance) : '')
+  const [current, setCurrent] = useState(match.attendance || null)
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    const val = parseInt(value)
+    if (isNaN(val) || val < 0) return
+    setSaving(true)
+    await supabase.from('matches').update({ attendance: val }).eq('id', match.id)
+    setCurrent(val)
+    setValue(String(val))
+    setEditing(false)
+    setSaving(false)
+  }
+
+  if (!editing && current) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+        <span style={{ fontSize: '13px', color: 'var(--gray-600)' }}>👥 {current.toLocaleString('sv-SE')} åskådare</span>
+        <button onClick={() => { setValue(String(current)); setEditing(true) }}
+          style={{ fontSize: '11px', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: 0 }}>
+          Ändra
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+      <input
+        type="number" min="0" value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && save()}
+        placeholder="Publikantal..."
+        autoFocus={editing}
+        style={{ width: '140px', padding: '5px 10px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+      />
+      <button onClick={save} disabled={saving || !value}
+        style={{ padding: '5px 12px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', opacity: !value ? 0.5 : 1 }}>
+        {saving ? '...' : '👥 Spara'}
+      </button>
+      {editing && (
+        <button onClick={() => setEditing(false)}
+          style={{ padding: '5px 8px', background: 'none', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', color: 'var(--gray-600)' }}>
+          Avbryt
+        </button>
+      )}
+    </div>
+  )
+}
+
 function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, openTimeModal, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible }) {
   const [search, setSearch] = useState('')
   const matchType = match.match_type || 'home'
@@ -231,6 +285,8 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
                 {' • '}{match.end_time || match.time}{match.time && match.end_time ? ` • Vaktstart ${match.time}` : ''}
               </div>
               <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--gray-900)' }}>{match.opponent}</div>
+              {/* Publikantal */}
+              <AttendanceInline match={match} />
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span style={{

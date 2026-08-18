@@ -141,6 +141,7 @@ function MatchPersonnelModal({ match, onClose }) {
   const [loading, setLoading] = useState(true)
   const [attendance, setAttendance] = useState(null)
   const [attendanceInput, setAttendanceInput] = useState('')
+  const [editingAttendance, setEditingAttendance] = useState(false)
   const [savingAttendance, setSavingAttendance] = useState(false)
 
   useEffect(() => { if (match) fetchPersonnel() }, [match])
@@ -154,6 +155,7 @@ function MatchPersonnelModal({ match, onClose }) {
     setSecurityId(matchData?.security_responsible_id || null)
     setAttendance(matchData?.attendance || null)
     setAttendanceInput(matchData?.attendance ? String(matchData.attendance) : '')
+    setEditingAttendance(!matchData?.attendance)
     const list = (asgn || [])
       .filter(a => a.personnel)
       .map(a => ({
@@ -173,7 +175,8 @@ function MatchPersonnelModal({ match, onClose }) {
     setSavingAttendance(true)
     await supabase.from('matches').update({ attendance: val }).eq('id', match.id)
     setAttendance(val)
-    setAttendanceInput('')
+    setAttendanceInput(String(val))
+    setEditingAttendance(false)
     setSavingAttendance(false)
   }
 
@@ -233,10 +236,10 @@ function MatchPersonnelModal({ match, onClose }) {
         {/* Publik */}
         <div style={{ margin:'0 20px 16px', padding:'12px 14px', background:'#f8fafc', borderRadius:'14px', border:'1px solid #e2e8f0' }}>
           <div style={{ fontSize:'11px', fontWeight:'700', color:'#4a5568', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'8px' }}>Publik</div>
-          {attendance !== null && attendanceInput === '' ? (
+          {!editingAttendance && attendance !== null ? (
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span style={{ fontSize:'18px', fontWeight:'700', color:'#1a202c' }}>{attendance.toLocaleString('sv-SE')} åskådare</span>
-              <button onClick={() => setAttendanceInput(String(attendance))} style={{ fontSize:'12px', color:'#ef4444', background:'none', border:'none', cursor:'pointer', fontWeight:'600' }}>Ändra</button>
+              <button onClick={() => { setAttendanceInput(String(attendance)); setEditingAttendance(true) }} style={{ fontSize:'12px', color:'#ef4444', background:'none', border:'none', cursor:'pointer', fontWeight:'600' }}>Ändra</button>
             </div>
           ) : (
             <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>

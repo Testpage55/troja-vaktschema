@@ -30,6 +30,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
   const [customCategory, setCustomCategory] = useState('')
   const [season, setSeason] = useState(DEFAULT_SEASONS[0])
   const [customSeason, setCustomSeason] = useState('')
+  const [attendance, setAttendance] = useState('')
   const [saving, setSaving] = useState(false)
 
   // time = matchstart i databasen
@@ -48,6 +49,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       setCustomCategory('')
       setSeason(match.season || DEFAULT_SEASONS[0])
       setCustomSeason('')
+      setAttendance(match.attendance ? String(match.attendance) : '')
     }
   }, [match])
 
@@ -74,6 +76,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       required_guards: parseInt(requiredGuards) || 4,
       category: finalCategory || null,
       season: finalSeason || null,
+      attendance: attendance ? parseInt(attendance) : null,
     })
     setSaving(false)
     onClose()
@@ -192,6 +195,19 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
                 autoFocus
               />
             )}
+          </div>
+
+          {/* Publikantal */}
+          <div className="form-group">
+            <label>Publikantal</label>
+            <input
+              type="number"
+              min="0"
+              value={attendance}
+              onChange={e => setAttendance(e.target.value)}
+              className="form-input"
+              placeholder="Antal åskådare (valfritt)"
+            />
           </div>
 
           {/* Säsong */}
