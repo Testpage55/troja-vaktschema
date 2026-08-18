@@ -1,9 +1,11 @@
+import { useModalBackButton } from '../../hooks/useModalBackButton'
 export default function ConfirmModal({
   isOpen, onClose, onConfirm,
   title, message,
   confirmText = 'Ta bort',
   confirmButtonClass = 'btn-danger'
 }) {
+  useModalBackButton(isOpen, onClose)
   if (!isOpen) return null
 
   return (

@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { useState } from 'react'
 
 function timeToMinutes(t) {
@@ -37,6 +38,7 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
   const [season, setSeason] = useState(DEFAULT_SEASONS[0])
   const [customSeason, setCustomSeason] = useState('')
   const [saving, setSaving] = useState(false)
+  useModalBackButton(isOpen, onClose)
 
   const allCategories = [...new Set([...availableCategories, 'Hockey', 'Fotboll', 'Konsert', 'Övrigt'])]
   const allSeasons = [...new Set([...DEFAULT_SEASONS, ...availableSeasons])]

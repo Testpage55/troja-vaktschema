@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { useState, useEffect } from 'react'
 
 function timeToMinutes(t) {
@@ -26,6 +27,7 @@ export default function TimePickerModal({ isOpen, onClose, onSave, personName, m
   const [hoursInput, setHoursInput] = useState('4.5')
   const [notes, setNotes] = useState('')
 
+  useModalBackButton(isOpen, onClose)
   useEffect(() => {
     if (!isOpen) return
 

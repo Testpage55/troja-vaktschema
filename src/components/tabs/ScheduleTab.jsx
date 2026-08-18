@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { SECURITY_RESPONSIBLE, REGULAR_GUARDS } from '../../constants'
 import EditMatchModal from '../modals/EditMatchModal'
 
@@ -481,6 +482,8 @@ export default function ScheduleTab({
 }) {
   const [selectedMatch, setSelectedMatch] = useState(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  useModalBackButton(!!selectedMatch, () => setSelectedMatch(null))
+  useModalBackButton(isEditModalOpen, () => setIsEditModalOpen(false))
   const allPersonnel = [...regularPersonnel, ...extraPersonnel]
 
   const monthGroups = groupMatchesByMonth()

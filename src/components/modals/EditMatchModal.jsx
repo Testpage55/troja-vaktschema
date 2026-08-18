@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { useState, useEffect } from 'react'
 
 function timeToMinutes(t) {
@@ -34,6 +35,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
   // time = matchstart i databasen
   const getMatchTime = (m) => m?.time || '19:00'
 
+  useModalBackButton(isOpen, onClose)
   useEffect(() => {
     if (match) {
       setDate(match.date || '')

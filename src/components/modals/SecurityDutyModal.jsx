@@ -1,3 +1,4 @@
+import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { useState, useEffect } from 'react'
 import { SECURITY_RESPONSIBLE } from '../../constants'
 
@@ -19,6 +20,7 @@ export default function SecurityDutyModal({ isOpen, onClose, onSave, duty = null
   const allSeasons = [...new Set([...DEFAULT_SEASONS, ...availableSeasons])]
   const isEditing = duty !== null
 
+  useModalBackButton(isOpen, onClose)
   useEffect(() => {
     if (isOpen) {
       if (isEditing && duty) {
