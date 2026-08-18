@@ -59,7 +59,7 @@ function NextMatch({ personnelId }) {
       .select('*, matches(*)')
       .eq('personnel_id', personnelId)
       .eq('is_working', true)
-    
+
     const upcoming = (data || [])
       .filter(a => a.matches?.date >= today)
       .sort((a,b) => new Date(a.matches.date) - new Date(b.matches.date))
@@ -97,30 +97,35 @@ function NextMatch({ personnelId }) {
 
   if (loading) return null
   if (!next) return (
-    <div style={{ background:'rgba(255,255,255,0.95)', backdropFilter:'blur(20px)', padding:'24px', borderRadius:'24px', boxShadow:'var(--glass-shadow)', border:'1px solid var(--glass-border)', textAlign:'center', color:'#718096' }}>
-      <h2 style={{ margin:'0 0 8px', fontSize:'18px', fontWeight:'700', color:'#1f2937' }}>Kommande arbetspass</h2>
-      <p style={{ margin:0 }}>Inga kommande pass schemalagda</p>
+    <div className="guard-card">
+      <h2 className="guard-card-title">Kommande arbetspass</h2>
+      <div className="guard-empty">
+        <p>Inga kommande pass schemalagda</p>
+      </div>
     </div>
   )
 
   const guardStart = (next.workHours?.start_time || (next.match.time ? minutesToTime(timeToMinutes(next.match.time)-120) : null))?.slice(0,5)
-  const guardEnd = next.workHours?.end_time || (next.match.time ? minutesToTime(timeToMinutes(next.match.time)+150) : null)
 
   return (
-    <div style={{ background:'rgba(255,255,255,0.95)', backdropFilter:'blur(20px)', padding:'24px', borderRadius:'24px', boxShadow:'var(--glass-shadow)', border:'1px solid var(--glass-border)' }}>
-      <h2 style={{ margin:'0 0 16px', fontSize:'18px', fontWeight:'700', color:'#1f2937' }}>Kommande arbetspass</h2>
-      <div style={{ background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)', color:'white', borderRadius:'16px', padding:'24px', textAlign:'center' }}>
-        <div style={{ fontSize:'20px', fontWeight:'700', marginBottom:'12px' }}>
+    <div className="guard-card">
+      <h2 className="guard-card-title">Kommande arbetspass</h2>
+      <div className="next-match-banner">
+        <div className="next-match-title">
           IF Troja-Ljungby – {next.match.opponent}
         </div>
-        <div style={{ background:'rgba(255,255,255,0.2)', borderRadius:'12px', padding:'16px', marginBottom:'16px' }}>
-          <div style={{ fontSize:'28px', fontWeight:'700', fontFamily:'monospace', marginBottom:'4px' }}>{countdown}</div>
-          <div style={{ fontSize:'12px', opacity:0.9 }}>kvar till {next.workHours ? 'arbetsstart' : 'matchstart'}</div>
+        <div className="next-match-countdown-box">
+          <div className="next-match-countdown">{countdown}</div>
+          <div className="next-match-countdown-label">
+            kvar till {next.workHours ? 'arbetsstart' : 'matchstart'}
+          </div>
         </div>
-        <div style={{ display:'flex', justifyContent:'center', gap:'16px', flexWrap:'wrap', fontSize:'14px', opacity:0.9 }}>
+        <div className="next-match-meta">
           <span>{fmtDate(next.match.date)}</span>
-          <span>Matchstart: {next.match.time}</span>
-          {guardStart && <span>Vaktstart: {guardStart}</span>}
+          <span>·</span>
+          <span>Match {next.match.time}</span>
+          {guardStart && <><span>·</span><span>Vaktstart {guardStart}</span></>}
+          <span>·</span>
           <span>{next.match.match_type === 'away' ? 'Bortamatch' : 'Hemmamatch'}</span>
         </div>
       </div>
@@ -134,6 +139,9 @@ function MatchPersonnelModal({ match, onClose }) {
   const [personnel, setPersonnel] = useState([])
   const [securityId, setSecurityId] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [attendance, setAttendance] = useState(null)
+  const [attendanceInput, setAttendanceInput] = useState('')
+  const [savingAttendance, setSavingAttendance] = useState(false)
 
   useEffect(() => { if (match) fetchPersonnel() }, [match])
 
@@ -141,9 +149,11 @@ function MatchPersonnelModal({ match, onClose }) {
     const [{ data: asgn }, { data: hours }, { data: matchData }] = await Promise.all([
       supabase.from('assignments').select('*, personnel(*)').eq('match_id', match.id).eq('is_working', true),
       supabase.from('work_hours').select('*').eq('match_id', match.id),
-      supabase.from('matches').select('security_responsible_id').eq('id', match.id).single(),
+      supabase.from('matches').select('security_responsible_id, attendance').eq('id', match.id).single(),
     ])
     setSecurityId(matchData?.security_responsible_id || null)
+    setAttendance(matchData?.attendance || null)
+    setAttendanceInput(matchData?.attendance ? String(matchData.attendance) : '')
     const list = (asgn || [])
       .filter(a => a.personnel)
       .map(a => ({
@@ -156,22 +166,6 @@ function MatchPersonnelModal({ match, onClose }) {
     setPersonnel(list)
     setLoading(false)
   }
-
-  const guardStart = match?.time ? minutesToTime(timeToMinutes(match.time) - 120) : null
-  const setCount = personnel.filter(p => p.workHours).length
-  const [attendance, setAttendance] = useState(null)
-  const [attendanceInput, setAttendanceInput] = useState('')
-  const [savingAttendance, setSavingAttendance] = useState(false)
-
-  useEffect(() => {
-    if (match?.id) {
-      supabase.from('matches').select('attendance').eq('id', match.id).single()
-        .then(({ data }) => {
-          setAttendance(data?.attendance || null)
-          setAttendanceInput(data?.attendance ? String(data.attendance) : '')
-        })
-    }
-  }, [match?.id])
 
   const saveAttendance = async () => {
     const val = parseInt(attendanceInput)
@@ -189,131 +183,117 @@ function MatchPersonnelModal({ match, onClose }) {
   function avatarColor(name) {
     let hash = 0
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-    const hue = Math.abs(hash) % 360
-    return `hsl(${hue}, 65%, 45%)`
+    return `hsl(${Math.abs(hash) % 360}, 65%, 45%)`
   }
+
+  const guardStart = match?.time ? minutesToTime(timeToMinutes(match.time) - 120) : null
+  const setCount = personnel.filter(p => p.workHours).length
 
   if (!match) return null
   return createPortal(
-    <div className="time-registration-modal" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="time-registration-content" style={{ maxWidth: '480px' }}>
-        <button className="close-button" onClick={onClose}>×</button>
-        <div className="time-registration-inner">
+    <div className="mob-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="mob-modal-sheet">
+        {/* Handle bar */}
+        <div className="mob-modal-handle" />
 
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#ef4444', marginBottom: '6px' }}>Vakter</div>
-            <h2 style={{ margin: '0 0 4px', fontSize: '22px', fontWeight: '800', color: '#1a202c', lineHeight: 1.2 }}>
-              IF Troja-Ljungby – {match.opponent}
-            </h2>
-            <p style={{ margin: 0, fontSize: '13px', color: '#718096' }}>
+        {/* Header */}
+        <div className="mob-modal-header">
+          <div>
+            <div className="mob-modal-eyebrow">Vakter</div>
+            <div className="mob-modal-title">IF Troja – {match.opponent}</div>
+            <div className="mob-modal-subtitle">
               {fmtDate(match.date)}
               {match.time && ` · Match ${match.time}`}
               {guardStart && ` · Vaktstart ${guardStart}`}
-            </p>
-          </div>
-
-          {!loading && personnel.length > 0 && (
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: '#4a5568' }}>Arbetstider registrerade</span>
-                <span style={{ fontSize: '12px', fontWeight: '700', color: setCount === personnel.length ? '#059669' : '#d97706' }}>
-                  {setCount} / {personnel.length}
-                </span>
-              </div>
-              <div style={{ height: '5px', background: 'rgba(0,0,0,0.08)', borderRadius: '99px', overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%',
-                  width: `${(setCount / personnel.length) * 100}%`,
-                  background: setCount === personnel.length ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#f59e0b,#d97706)',
-                  borderRadius: '99px',
-                  transition: 'width 0.4s ease'
-                }} />
-              </div>
             </div>
-          )}
-
-          {/* Publiksiffra */}
-          <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Publik</div>
-            {attendance !== null && attendanceInput === '' ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '18px', fontWeight: '700', color: '#1a202c' }}>{attendance.toLocaleString('sv-SE')} åskådare</span>
-                <button onClick={() => setAttendanceInput(String(attendance))} style={{ fontSize: '12px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>Ändra</button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input
-                  type="number"
-                  min="0"
-                  value={attendanceInput}
-                  onChange={e => setAttendanceInput(e.target.value)}
-                  placeholder="Ange publiksiffra..."
-                  style={{ flex: 1, padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', outline: 'none' }}
-                  onKeyDown={e => e.key === 'Enter' && saveAttendance()}
-                />
-                <button
-                  onClick={saveAttendance}
-                  disabled={savingAttendance || !attendanceInput}
-                  style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', flexShrink: 0, opacity: !attendanceInput ? 0.5 : 1 }}
-                >
-                  {savingAttendance ? '...' : 'Spara'}
-                </button>
-              </div>
-            )}
           </div>
+          <button className="mob-modal-close" onClick={onClose}>×</button>
+        </div>
 
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#718096' }}>Laddar...</div>
-          ) : personnel.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#718096', background: 'rgba(0,0,0,0.04)', borderRadius: '16px' }}>
-              Inga vakter tilldelade
+        {/* Progress */}
+        {!loading && personnel.length > 0 && (
+          <div style={{ padding: '0 20px 12px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'5px' }}>
+              <span style={{ fontSize:'12px', fontWeight:'600', color:'#4a5568' }}>Tider registrerade</span>
+              <span style={{ fontSize:'12px', fontWeight:'700', color: setCount === personnel.length ? '#059669' : '#d97706' }}>
+                {setCount} / {personnel.length}
+              </span>
+            </div>
+            <div style={{ height:'5px', background:'rgba(0,0,0,0.08)', borderRadius:'99px', overflow:'hidden' }}>
+              <div style={{
+                height:'100%',
+                width:`${(setCount / personnel.length) * 100}%`,
+                background: setCount === personnel.length ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#f59e0b,#d97706)',
+                borderRadius:'99px', transition:'width 0.4s ease'
+              }} />
+            </div>
+          </div>
+        )}
+
+        {/* Publik */}
+        <div style={{ margin:'0 20px 16px', padding:'12px 14px', background:'#f8fafc', borderRadius:'14px', border:'1px solid #e2e8f0' }}>
+          <div style={{ fontSize:'11px', fontWeight:'700', color:'#4a5568', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'8px' }}>Publik</div>
+          {attendance !== null && attendanceInput === '' ? (
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:'18px', fontWeight:'700', color:'#1a202c' }}>{attendance.toLocaleString('sv-SE')} åskådare</span>
+              <button onClick={() => setAttendanceInput(String(attendance))} style={{ fontSize:'12px', color:'#ef4444', background:'none', border:'none', cursor:'pointer', fontWeight:'600' }}>Ändra</button>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+              <input type="number" min="0" value={attendanceInput} onChange={e => setAttendanceInput(e.target.value)}
+                placeholder="Ange publiksiffra..."
+                style={{ flex:1, padding:'8px 12px', border:'1px solid #e2e8f0', borderRadius:'10px', fontSize:'15px', outline:'none' }}
+                onKeyDown={e => e.key === 'Enter' && saveAttendance()} />
+              <button onClick={saveAttendance} disabled={savingAttendance || !attendanceInput}
+                style={{ padding:'8px 16px', background:'#ef4444', color:'white', border:'none', borderRadius:'10px', fontWeight:'600', fontSize:'14px', cursor:'pointer', flexShrink:0, opacity:!attendanceInput?0.5:1 }}>
+                {savingAttendance ? '...' : 'Spara'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Personnel list */}
+        <div style={{ padding:'0 20px 32px', overflowY:'auto', flex:1 }}>
+          {loading ? (
+            <div style={{ textAlign:'center', padding:'32px', color:'#718096' }}>Laddar...</div>
+          ) : personnel.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'32px', color:'#718096', background:'rgba(0,0,0,0.04)', borderRadius:'16px' }}>Inga vakter tilldelade</div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
               {personnel.map(p => {
                 const isSecurity = p.personnelId === securityId
                 const wh = p.workHours
                 return (
                   <div key={p.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '12px',
-                    padding: '12px 14px', borderRadius: '14px',
-                    background: 'white',
-                    border: `1.5px solid ${wh ? '#bbf7d0' : '#fde68a'}`,
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+                    display:'flex', alignItems:'center', gap:'12px',
+                    padding:'12px 14px', borderRadius:'14px', background:'white',
+                    border:`1.5px solid ${wh ? '#bbf7d0' : '#fde68a'}`,
+                    boxShadow:'0 1px 3px rgba(0,0,0,0.06)'
                   }}>
                     <div style={{
-                      width: '38px', height: '38px', borderRadius: '50%',
-                      background: avatarColor(p.name), color: 'white',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: '700', fontSize: '13px', flexShrink: 0
+                      width:'38px', height:'38px', borderRadius:'50%', flexShrink:0,
+                      background: avatarColor(p.name), color:'white',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      fontWeight:'700', fontSize:'13px'
                     }}>
                       {getInitials(p.name)}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontWeight: '700', fontSize: '15px', color: '#1a202c' }}>{p.name}</span>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' }}>
+                        <span style={{ fontWeight:'700', fontSize:'15px', color:'#1a202c' }}>{p.name}</span>
                         {isSecurity && (
-                          <span style={{
-                            fontSize: '10px', fontWeight: '700', letterSpacing: '0.05em',
-                            background: '#1d4ed8', color: 'white',
-                            padding: '2px 7px', borderRadius: '99px', textTransform: 'uppercase'
-                          }}>
-                            Säk.ansvarig
-                          </span>
+                          <span style={{ fontSize:'10px', fontWeight:'700', background:'#1d4ed8', color:'white', padding:'2px 7px', borderRadius:'99px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Säk.ansvarig</span>
                         )}
                       </div>
                       {wh ? (
-                        <div style={{ fontSize: '12px', color: '#059669', fontWeight: '600', marginTop: '1px' }}>
+                        <div style={{ fontSize:'12px', color:'#059669', fontWeight:'600', marginTop:'1px' }}>
                           {fmtTime(wh.start_time)} – {fmtTime(wh.end_time)} · {calcHours(wh.start_time, wh.end_time)}h
                         </div>
                       ) : (
-                        <div style={{ fontSize: '12px', color: '#d97706', fontWeight: '500', marginTop: '1px' }}>Tider ej registrerade</div>
+                        <div style={{ fontSize:'12px', color:'#d97706', fontWeight:'500', marginTop:'1px' }}>Tider ej registrerade</div>
                       )}
                     </div>
-                    <div style={{
-                      width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                      background: wh ? '#10b981' : '#f59e0b'
-                    }} />
+                    <div style={{ width:'8px', height:'8px', borderRadius:'50%', flexShrink:0, background: wh ? '#10b981' : '#f59e0b' }} />
                   </div>
                 )
               })}
@@ -365,7 +345,6 @@ function TimeModal({ assignment, personnelId, onClose, onSave }) {
       const payload = { match_id: assignment.match_id, personnel_id: personnelId, start_time: start, end_time: end, work_date: assignment.matches.date, notes: notes.trim()||null }
       if (wh?.id) await supabase.from('work_hours').update(payload).eq('id', wh.id)
       else await supabase.from('work_hours').insert([payload])
-      // Spara publik om ifyllt
       if (attendanceInput) {
         const val = parseInt(attendanceInput)
         if (!isNaN(val) && val >= 0) {
@@ -377,45 +356,53 @@ function TimeModal({ assignment, personnelId, onClose, onSave }) {
     finally { setSaving(false) }
   }
 
-  const adjBtn = { width:'44px', height:'44px', border:'none', borderRadius:'14px', background:'linear-gradient(135deg,#e02020,#b91c1c)', fontSize:'22px', fontWeight:'700', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'white', flexShrink:0, boxShadow:'0 3px 10px rgba(185,28,28,0.3)' }
+  const adjBtn = {
+    width:'48px', height:'48px', border:'none', borderRadius:'14px',
+    background:'linear-gradient(135deg,#e02020,#b91c1c)',
+    fontSize:'22px', fontWeight:'700', cursor:'pointer',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    color:'white', flexShrink:0, boxShadow:'0 3px 10px rgba(185,28,28,0.3)',
+    touchAction:'manipulation'
+  }
 
   return (
-    <div className="time-registration-modal" onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:'420px', background:'white', borderRadius:'28px', overflow:'hidden', boxShadow:'0 24px 60px rgba(0,0,0,0.25)', margin:'auto' }}>
+    <div className="mob-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="mob-modal-sheet mob-modal-sheet--time">
+        <div className="mob-modal-handle" />
 
         {/* Header */}
-        <div style={{ background:'white', padding:'22px 22px 16px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'flex-start', gap:'14px', position:'relative' }}>
-          <div style={{ width:'44px', height:'44px', borderRadius:'12px', background:'#fef2f2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <img src="/images/troja-logo.png" alt="" style={{ width:'32px', height:'32px', objectFit:'contain' }} />
-          </div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:'10px', fontWeight:'800', letterSpacing:'0.12em', textTransform:'uppercase', color:'#e02020', marginBottom:'2px' }}>{wh ? 'Ändra arbetstider' : 'Sätt arbetstider'}</div>
-            <div style={{ fontSize:'17px', fontWeight:'800', color:'#111827', lineHeight:1.2 }}>{assignment.matches?.opponent}</div>
-            <div style={{ fontSize:'12px', color:'#9ca3af', marginTop:'3px' }}>
-              {fmtDate(assignment.matches?.date)}{matchTime && ` · Match ${matchTime} · Vaktstart ${guardStart}`}
+        <div className="mob-modal-header">
+          <div style={{ display:'flex', alignItems:'center', gap:'12px', flex:1, minWidth:0 }}>
+            <div style={{ width:'40px', height:'40px', borderRadius:'10px', background:'#fef2f2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <img src="/images/troja-logo.png" alt="" style={{ width:'28px', height:'28px', objectFit:'contain' }} />
+            </div>
+            <div style={{ minWidth:0 }}>
+              <div className="mob-modal-eyebrow">{wh ? 'Ändra arbetstider' : 'Sätt arbetstider'}</div>
+              <div className="mob-modal-title" style={{ fontSize:'16px' }}>{assignment.matches?.opponent}</div>
+              <div className="mob-modal-subtitle">{fmtDate(assignment.matches?.date)}{matchTime && ` · Match ${matchTime} · Vaktstart ${guardStart}`}</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ position:'absolute', top:'14px', right:'14px', width:'28px', height:'28px', borderRadius:'50%', background:'#f1f5f9', border:'none', fontSize:'16px', cursor:'pointer', color:'#6b7280', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+          <button className="mob-modal-close" onClick={onClose}>×</button>
         </div>
 
         {/* Body */}
-        <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:'14px', background:'#f9fafb' }}>
+        <div style={{ padding:'16px 20px', display:'flex', flexDirection:'column', gap:'14px', overflowY:'auto', flex:1 }}>
 
-          {/* Starttid + Sluttid */}
+          {/* Starttid / Sluttid */}
           {[['start','Starttid',start,setStart],['end','Sluttid',end,setEnd]].map(([which,label,val,setter])=>(
             <div key={which}>
-              <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'6px' }}>{label}</div>
-              <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+              <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'8px' }}>{label}</div>
+              <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                 <button style={adjBtn} onClick={()=>adjustTime(which,-15)}>−</button>
                 <input type="time" value={val} onChange={e=>setter(e.target.value)}
-                  style={{ flex:1, height:'48px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'24px', fontWeight:'800', textAlign:'center', outline:'none', color:'#111827', background:'white', fontVariantNumeric:'tabular-nums' }} />
+                  style={{ flex:1, height:'52px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'22px', fontWeight:'800', textAlign:'center', outline:'none', color:'#111827', background:'white', fontVariantNumeric:'tabular-nums' }} />
                 <button style={adjBtn} onClick={()=>adjustTime(which,15)}>+</button>
               </div>
             </div>
           ))}
 
-          {/* Totalt — kompakt */}
-          <div style={{ textAlign:'center', padding:'8px 0 0' }}>
+          {/* Totalt */}
+          <div style={{ textAlign:'center', padding:'4px 0' }}>
             <span style={{ fontSize:'15px', fontWeight:'700', color: isStandard ? '#059669' : '#d97706' }}>
               {hours}h totalt{!isStandard && ' · Avviker från standard'}
             </span>
@@ -423,23 +410,24 @@ function TimeModal({ assignment, personnelId, onClose, onSave }) {
 
           {/* Publik */}
           <div>
-            <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'6px' }}>Publik (valfritt)</div>
+            <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'8px' }}>Publik (valfritt)</div>
             <input type="number" min="0" value={attendanceInput} onChange={e=>setAttendanceInput(e.target.value)}
               placeholder={attendance ? `Nuvarande: ${attendance.toLocaleString('sv-SE')}` : 'Antal åskådare...'}
-              style={{ width:'100%', height:'44px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'16px', fontWeight:'600', padding:'0 14px', outline:'none', color:'#111827', background:'white', boxSizing:'border-box' }} />
+              style={{ width:'100%', height:'48px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'16px', fontWeight:'600', padding:'0 14px', outline:'none', color:'#111827', background:'white', boxSizing:'border-box' }} />
           </div>
 
           {/* Anteckningar */}
           <div>
-            <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'6px' }}>Anteckningar (valfritt)</div>
+            <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'8px' }}>Anteckningar (valfritt)</div>
             <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="T.ex. övertid, paus..." rows={2}
               style={{ width:'100%', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'14px', padding:'10px 14px', fontFamily:'inherit', resize:'none', outline:'none', color:'#111827', background:'white', boxSizing:'border-box' }} />
           </div>
 
           {/* Knappar */}
-          <div style={{ display:'flex', gap:'10px', paddingTop:'2px' }}>
-            <button onClick={onClose} style={{ flex:1, height:'50px', background:'white', border:'2px solid #e5e7eb', borderRadius:'16px', fontSize:'15px', fontWeight:'600', cursor:'pointer', color:'#374151' }}>Avbryt</button>
-            <button onClick={handleSave} disabled={saving||!start||!end} style={{ flex:2, height:'50px', background:saving?'#d1d5db':'linear-gradient(135deg,#e02020,#b91c1c)', border:'none', borderRadius:'16px', fontSize:'15px', fontWeight:'700', cursor:saving?'not-allowed':'pointer', color:'white', boxShadow:'0 4px 16px rgba(185,28,28,0.35)' }}>
+          <div style={{ display:'flex', gap:'10px', paddingBottom:'8px' }}>
+            <button onClick={onClose} style={{ flex:1, height:'52px', background:'white', border:'2px solid #e5e7eb', borderRadius:'16px', fontSize:'15px', fontWeight:'600', cursor:'pointer', color:'#374151', touchAction:'manipulation' }}>Avbryt</button>
+            <button onClick={handleSave} disabled={saving||!start||!end}
+              style={{ flex:2, height:'52px', background:saving?'#d1d5db':'linear-gradient(135deg,#e02020,#b91c1c)', border:'none', borderRadius:'16px', fontSize:'15px', fontWeight:'700', cursor:saving?'not-allowed':'pointer', color:'white', boxShadow:'0 4px 16px rgba(185,28,28,0.35)', touchAction:'manipulation' }}>
               {saving ? 'Sparar...' : wh ? 'Uppdatera' : 'Spara tider'}
             </button>
           </div>
@@ -463,19 +451,17 @@ function ScheduleModal({ assignments, onClose }) {
   const weekdays = ['Sön','Mån','Tis','Ons','Tor','Fre','Lör']
 
   return createPortal(
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', zIndex:99999, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }}
-      onClick={e => e.target===e.currentTarget && onClose()}>
-      <div style={{ background:'white', borderRadius:'24px', width:'100%', maxWidth:'360px', overflow:'hidden', boxShadow:'0 20px 50px rgba(0,0,0,0.2)' }}>
-        {/* Header */}
-        <div style={{ padding:'20px 20px 16px', borderBottom:'1px solid #f1f5f9', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+    <div className="mob-modal-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="mob-modal-sheet">
+        <div className="mob-modal-handle" />
+        <div className="mob-modal-header">
           <div>
-            <div style={{ fontSize:'10px', fontWeight:'800', letterSpacing:'0.1em', textTransform:'uppercase', color:'#e02020', marginBottom:'2px' }}>Kommande pass</div>
-            <div style={{ fontSize:'18px', fontWeight:'800', color:'#111827' }}>{upcoming.length} schemalagda</div>
+            <div className="mob-modal-eyebrow">Kommande pass</div>
+            <div className="mob-modal-title">{upcoming.length} schemalagda</div>
           </div>
-          <button onClick={onClose} style={{ width:'30px', height:'30px', borderRadius:'50%', background:'#f1f5f9', border:'none', cursor:'pointer', fontSize:'16px', color:'#6b7280', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+          <button className="mob-modal-close" onClick={onClose}>×</button>
         </div>
-        {/* Lista */}
-        <div style={{ maxHeight:'60vh', overflow:'auto', padding:'12px' }}>
+        <div style={{ overflowY:'auto', flex:1, padding:'12px 16px 32px' }}>
           {upcoming.length === 0 ? (
             <div style={{ textAlign:'center', padding:'32px', color:'#9ca3af', fontSize:'14px' }}>Inga kommande pass</div>
           ) : upcoming.map(a => {
@@ -526,7 +512,6 @@ function MyHours({ personnelId }) {
     const activeMatchIds = new Set((activeAssignments || []).map(a => a.match_id))
     const all = (data || []).filter(wh => activeMatchIds.has(wh.match_id))
 
-    // Hämta delegater för dessa matcher
     const matchIds = all.map(wh => wh.match_id)
     if (matchIds.length > 0) {
       const { data: dels } = await supabase.from('delegates').select('match_id, name').in('match_id', matchIds)
@@ -549,17 +534,19 @@ function MyHours({ personnelId }) {
   const shown = showAll ? hours : hours.slice(0,5)
 
   return (
-    <div style={{ background:'rgba(255,255,255,0.95)', backdropFilter:'blur(20px)', padding:'24px', borderRadius:'24px', boxShadow:'var(--glass-shadow)', border:'1px solid var(--glass-border)' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px' }}>
-        <h2 style={{ margin:0, fontSize:'18px', fontWeight:'700', color:'#1f2937' }}>Mina Arbetstider</h2>
-        <div style={{ background:'linear-gradient(135deg,#10b981 0%,#059669 100%)', color:'white', padding:'8px 16px', borderRadius:'12px', fontSize:'14px', fontWeight:'600', display:'flex', gap:'8px' }}>
-          <span>{hours.length} pass</span><span>•</span><span>{totalHours.toFixed(1)}h</span>
+    <div className="guard-card">
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', gap:'12px' }}>
+        <h2 className="guard-card-title" style={{ margin:0 }}>Mina Arbetstider</h2>
+        <div style={{ background:'linear-gradient(135deg,#10b981 0%,#059669 100%)', color:'white', padding:'6px 14px', borderRadius:'12px', fontSize:'13px', fontWeight:'600', display:'flex', gap:'6px', flexShrink:0 }}>
+          <span>{hours.length} pass</span><span>·</span><span>{totalHours.toFixed(1)}h</span>
         </div>
       </div>
+
       {availableSeasons.length >= 1 && (
         <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'12px' }}>
           {availableSeasons.map(s => (
-            <button key={s} onClick={() => { setSeasonFilter(s); setShowAll(false); setFromDate(''); setToDate('') }} style={{ padding:'6px 14px', borderRadius:'99px', fontSize:'13px', fontWeight:'600', border:'none', cursor:'pointer', background: seasonFilter===s ? 'linear-gradient(135deg,#10b981,#059669)' : 'white', color: seasonFilter===s ? 'white' : '#4a5568', boxShadow: seasonFilter===s ? '0 2px 8px rgba(16,185,129,0.4)' : 'var(--shadow-sm)', minHeight:'36px' }}>
+            <button key={s} onClick={() => { setSeasonFilter(s); setShowAll(false); setFromDate(''); setToDate('') }}
+              style={{ padding:'6px 14px', borderRadius:'99px', fontSize:'13px', fontWeight:'600', border:'none', cursor:'pointer', background: seasonFilter===s ? 'linear-gradient(135deg,#10b981,#059669)' : 'white', color: seasonFilter===s ? 'white' : '#4a5568', boxShadow: seasonFilter===s ? '0 2px 8px rgba(16,185,129,0.4)' : 'var(--shadow-sm)', minHeight:'36px', touchAction:'manipulation' }}>
               {s}
             </button>
           ))}
@@ -567,14 +554,15 @@ function MyHours({ personnelId }) {
       )}
 
       {/* Periodfilter */}
-      <div style={{ display:'flex', gap:'8px', marginBottom:'16px', alignItems:'center' }}>
+      <div style={{ display:'flex', gap:'8px', marginBottom:'16px', alignItems:'center', flexWrap:'wrap' }}>
         <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setSeasonFilter(null); setShowAll(false) }}
-          style={{ flex:1, padding:'7px 10px', border:'1.5px solid #e5e7eb', borderRadius:'10px', fontSize:'13px', color:'#374151', outline:'none' }} />
+          style={{ flex:'1 1 120px', minWidth:'120px', padding:'7px 10px', border:'1.5px solid #e5e7eb', borderRadius:'10px', fontSize:'13px', color:'#374151', outline:'none' }} />
         <span style={{ color:'#9ca3af', fontSize:'13px' }}>–</span>
         <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setSeasonFilter(null); setShowAll(false) }}
-          style={{ flex:1, padding:'7px 10px', border:'1.5px solid #e5e7eb', borderRadius:'10px', fontSize:'13px', color:'#374151', outline:'none' }} />
+          style={{ flex:'1 1 120px', minWidth:'120px', padding:'7px 10px', border:'1.5px solid #e5e7eb', borderRadius:'10px', fontSize:'13px', color:'#374151', outline:'none' }} />
         {(fromDate || toDate) && (
-          <button onClick={() => { setFromDate(''); setToDate(''); setSeasonFilter(availableSeasons[0]||null) }} style={{ padding:'7px 10px', border:'none', borderRadius:'10px', background:'#fee2e2', color:'#b91c1c', fontSize:'12px', fontWeight:'600', cursor:'pointer', whiteSpace:'nowrap' }}>
+          <button onClick={() => { setFromDate(''); setToDate(''); setSeasonFilter(availableSeasons[0]||null) }}
+            style={{ padding:'7px 10px', border:'none', borderRadius:'10px', background:'#fee2e2', color:'#b91c1c', fontSize:'12px', fontWeight:'600', cursor:'pointer', whiteSpace:'nowrap' }}>
             Rensa
           </button>
         )}
@@ -591,21 +579,19 @@ function MyHours({ personnelId }) {
         <>
           <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
             {shown.map(wh => (
-              <div key={wh.id} style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'12px', padding:'14px', display:'grid', gridTemplateColumns:'auto 1fr auto', gap:'12px', alignItems:'center' }}>
-                <div style={{ background:'#ef4444', color:'white', padding:'4px 8px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', minWidth:'50px', textAlign:'center' }}>
+              <div key={wh.id} style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'12px', padding:'12px', display:'flex', alignItems:'center', gap:'10px' }}>
+                <div style={{ background:'#ef4444', color:'white', padding:'4px 8px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', minWidth:'46px', textAlign:'center', flexShrink:0 }}>
                   {fmtDate(wh.work_date, true)}
                 </div>
-                <div>
-                  <div style={{ fontWeight:'600', color:'#1f2937', fontSize:'14px' }}>{wh.matches?.opponent||'Uppdrag'}</div>
-                  <div style={{ fontSize:'12px', color:'#718096', display:'flex', gap:'8px', flexWrap:'wrap', marginTop:'1px' }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontWeight:'600', color:'#1f2937', fontSize:'14px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{wh.matches?.opponent||'Uppdrag'}</div>
+                  <div style={{ fontSize:'12px', color:'#718096', display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'1px' }}>
                     <span>{fmtTime(wh.start_time)} – {fmtTime(wh.end_time)}</span>
                     {wh.matches?.attendance && <span style={{ color:'#9ca3af' }}>· 👥 {wh.matches.attendance.toLocaleString('sv-SE')}</span>}
-                    {delegatesMap[wh.match_id]?.length > 0 && (
-                      <span style={{ color:'#7c3aed', fontWeight:'600' }}>· 🎖 Delegat</span>
-                    )}
+                    {delegatesMap[wh.match_id]?.length > 0 && <span style={{ color:'#7c3aed', fontWeight:'600' }}>· 🎖 Delegat</span>}
                   </div>
                 </div>
-                <div style={{ background:'#10b981', color:'white', padding:'4px 10px', borderRadius:'12px', fontSize:'12px', fontWeight:'700' }}>
+                <div style={{ background:'#10b981', color:'white', padding:'4px 10px', borderRadius:'12px', fontSize:'12px', fontWeight:'700', flexShrink:0 }}>
                   {(parseFloat(wh.total_hours)||calcHours(wh.start_time,wh.end_time)).toFixed(1)}h
                 </div>
               </div>
@@ -613,7 +599,7 @@ function MyHours({ personnelId }) {
           </div>
           {hours.length > 3 && (
             <div style={{ textAlign:'center', marginTop:'16px' }}>
-              <button onClick={()=>setShowAll(v=>!v)} style={{ background:'transparent', border:'2px solid #10b981', color:'#10b981', borderRadius:'12px', padding:'8px 24px', fontSize:'14px', fontWeight:'600', cursor:'pointer' }}>
+              <button onClick={()=>setShowAll(v=>!v)} style={{ background:'transparent', border:'2px solid #10b981', color:'#10b981', borderRadius:'12px', padding:'8px 24px', fontSize:'14px', fontWeight:'600', cursor:'pointer', touchAction:'manipulation' }}>
                 {showAll ? `Visa färre` : `Visa alla (${hours.length-3} till)`}
               </button>
             </div>
@@ -643,17 +629,16 @@ function AssignedMatches({ assignments, onEditTimes }) {
   const shown = showAll ? filtered : filtered.slice(0,3)
 
   return (
-    <div style={{ background:'rgba(255,255,255,0.95)', backdropFilter:'blur(20px)', padding:'24px', borderRadius:'24px', boxShadow:'var(--glass-shadow)', border:'1px solid var(--glass-border)' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
-        <h2 style={{ margin:0, fontSize:'18px', fontWeight:'700', color:'#1f2937' }}>Kommande Matcher</h2>
+    <div className="guard-card">
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', gap:'12px' }}>
+        <h2 className="guard-card-title" style={{ margin:0 }}>Kommande Matcher</h2>
         {filtered.length > 3 && (
-          <div onClick={()=>setShowAll(v=>!v)} style={{ background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)', color:'white', padding:'8px 16px', borderRadius:'12px', fontSize:'14px', fontWeight:'600', cursor:'pointer' }}>
+          <button onClick={()=>setShowAll(v=>!v)}
+            style={{ background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)', color:'white', padding:'6px 14px', borderRadius:'12px', fontSize:'13px', fontWeight:'600', border:'none', cursor:'pointer', flexShrink:0, touchAction:'manipulation' }}>
             {showAll ? 'Visa färre' : `${filtered.length} matcher`}
-          </div>
+          </button>
         )}
       </div>
-
-
 
       {filtered.length === 0 ? (
         <div style={{ textAlign:'center', padding:'40px', color:'#6b7280', background:'#f8fafc', borderRadius:'16px', border:'2px dashed #cbd5e0' }}>
@@ -665,39 +650,37 @@ function AssignedMatches({ assignments, onEditTimes }) {
           {shown.map(a => {
             const match = a.matches
             const wh = a.workHours
-            const d = new Date(match.date); d.setHours(0,0,0,0)
-            const isPast = d < today
             const guardStart = match.time ? minutesToTime(timeToMinutes(match.time)-120) : null
 
             return (
-              <div key={a.id} style={{ border:'1px solid #e5e7eb', borderRadius:'16px', padding:'20px', background:'white', opacity:isPast?0.75:1 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'12px' }}>
-                  <div style={{ flex:1 }}>
-                    <h3 onClick={()=>setSelectedMatch(match)} style={{ margin:'0 0 4px', fontSize:'17px', fontWeight:'700', color:'#ef4444', cursor:'pointer', textDecoration:'underline', textDecorationColor:'transparent' }}
-                      onMouseEnter={e=>{e.target.style.textDecorationColor='#ef4444'}}
-                      onMouseLeave={e=>{e.target.style.textDecorationColor='transparent'}}>
-                      IF Troja-Ljungby – {match.opponent} 👥
-                    </h3>
-                    <div style={{ color:'#6b7280', fontSize:'13px', marginBottom:'10px' }}>
-                      {fmtDate(match.date)} • Match {match.time||'TBA'}{guardStart&&` • Vaktstart ${guardStart}`} • {match.match_type==='away'?'Borta':'Hemma'}
-                    </div>
-                    {wh ? (
-                      <div style={{ background:'#d1fae5', border:'1px solid #10b981', padding:'8px 12px', borderRadius:'8px', fontSize:'13px', color:'#065f46', fontWeight:'500', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span>✓ Arbetstider: {fmtTime(wh.start_time)} – {fmtTime(wh.end_time)} ({calcHours(wh.start_time,wh.end_time)}h)</span>
-                        {match.attendance && <span style={{ color:'#374151', fontWeight:'600' }}>👥 {match.attendance.toLocaleString('sv-SE')}</span>}
-                      </div>
-                    ) : !isPast && (
-                      <div style={{ background:'#fef3c7', border:'1px solid #f59e0b', padding:'6px 12px', borderRadius:'8px', fontSize:'12px', color:'#92400e', fontWeight:'500' }}>
-                        ⚠ Tider inte registrerade
-                      </div>
-                    )}
-                  </div>
-                  {!isPast && (
-                    <button onClick={()=>onEditTimes(a)} className="btn btn-primary btn-small" style={{ flexShrink:0 }}>
-                      {wh?'Ändra':'Sätt tider'}
-                    </button>
-                  )}
+              <div key={a.id} style={{ border:'1px solid #e5e7eb', borderRadius:'16px', padding:'16px', background:'white' }}>
+                {/* Match title row */}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px', marginBottom:'6px' }}>
+                  <h3 onClick={()=>setSelectedMatch(match)}
+                    style={{ margin:0, fontSize:'16px', fontWeight:'700', color:'#ef4444', cursor:'pointer', flex:1, minWidth:0 }}>
+                    IF Troja – {match.opponent} 👥
+                  </h3>
+                  <button onClick={()=>onEditTimes(a)} className="btn btn-primary btn-small" style={{ flexShrink:0, touchAction:'manipulation' }}>
+                    {wh?'Ändra':'Sätt tider'}
+                  </button>
                 </div>
+                {/* Meta */}
+                <div style={{ color:'#6b7280', fontSize:'12px', marginBottom:'10px' }}>
+                  {fmtDate(match.date)} · {match.match_type==='away'?'Borta':'Hemma'}
+                  {match.time && ` · Match ${match.time}`}
+                  {guardStart && ` · Vaktstart ${guardStart}`}
+                </div>
+                {/* Status */}
+                {wh ? (
+                  <div style={{ background:'#d1fae5', border:'1px solid #10b981', padding:'8px 12px', borderRadius:'8px', fontSize:'13px', color:'#065f46', fontWeight:'500', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'6px' }}>
+                    <span>✓ {fmtTime(wh.start_time)} – {fmtTime(wh.end_time)} ({calcHours(wh.start_time,wh.end_time)}h)</span>
+                    {match.attendance && <span style={{ color:'#374151', fontWeight:'600' }}>👥 {match.attendance.toLocaleString('sv-SE')}</span>}
+                  </div>
+                ) : (
+                  <div style={{ background:'#fef3c7', border:'1px solid #f59e0b', padding:'6px 12px', borderRadius:'8px', fontSize:'12px', color:'#92400e', fontWeight:'500' }}>
+                    ⚠ Tider inte registrerade
+                  </div>
+                )}
               </div>
             )
           })}
@@ -711,11 +694,9 @@ function AssignedMatches({ assignments, onEditTimes }) {
 
 // ─── GuardApp (main) ──────────────────────────────────────────────────────────
 
-export default function GuardApp({ personnelId, personnelName, onSignOut, embedded = false }) {
+export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmin = false, embedded = false }) {
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
-  const [seasonFilter, setSeasonFilter] = useState('current')
-  const [availableSeasons, setAvailableSeasons] = useState([])
   const [editingAssignment, setEditingAssignment] = useState(null)
   const [showSchedule, setShowSchedule] = useState(false)
 
@@ -734,14 +715,12 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, embedd
       return { ...a, workHours: wh||null }
     }))
 
-    const seasons = [...new Set(withHours.map(a=>a.matches?.season).filter(Boolean))].sort().reverse()
-    setAvailableSeasons(seasons)
     setAssignments(withHours)
     setLoading(false)
   }
 
   if (loading) return (
-    <div style={{ minHeight:embedded?'200px':'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)' }}>
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)' }}>
       <div style={{ textAlign:'center', background:'rgba(255,255,255,0.1)', padding:'40px', borderRadius:'24px', backdropFilter:'blur(20px)', border:'1px solid rgba(255,255,255,0.2)' }}>
         <div style={{ width:'48px', height:'48px', border:'4px solid rgba(255,255,255,0.3)', borderTop:'4px solid white', borderRadius:'50%', animation:'spin 1s linear infinite', margin:'0 auto 16px' }} />
         <div style={{ color:'white', fontWeight:'700', fontSize:'18px' }}>Laddar...</div>
@@ -750,41 +729,45 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, embedd
   )
 
   return (
-    <div className="app" style={{ background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)', minHeight:'100vh' }}>
-      <div className="dashboard">
-        <div className="dashboard-header">
-          <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
-            <img src="/images/troja-logo.png" alt="Troja" style={{ height:'48px' }} />
-            <div>
-              <h1>Välkommen {personnelName}!</h1>
-              <p style={{ margin:0, fontSize:'14px', color:'#718096' }}>Översikt för kommande uppdrag</p>
-            </div>
+    <div className="guard-app">
+      {/* Header */}
+      <div className="guard-header">
+        <div className="guard-header-left">
+          <img src="/images/troja-logo.png" alt="Troja" className="guard-header-logo" />
+          <div>
+            <h1 className="guard-header-title">Välkommen {personnelName}!</h1>
+            <p className="guard-header-sub">Översikt för kommande uppdrag</p>
           </div>
-          {onSignOut && (
-            <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
-              <button onClick={() => setShowSchedule(true)} style={{ background:'#fef2f2', border:'1.5px solid #fecaca', borderRadius:'10px', color:'#e02020', padding:'8px 14px', cursor:'pointer', fontSize:'13px', fontWeight:'600', display:'flex', flexDirection:'column', alignItems:'center', lineHeight:1.2 }}>
-                <span style={{ fontSize:'18px' }}>📋</span>
-                <span style={{ fontSize:'11px', marginTop:'2px' }}>Mitt schema</span>
+        </div>
+        {onSignOut && (
+          <div className="guard-header-actions">
+            <button onClick={() => setShowSchedule(true)} className="guard-schedule-btn">
+              <span style={{ fontSize:'18px' }}>📋</span>
+              <span>Mitt schema</span>
+            </button>
+            {isAdmin && (
+              <button
+                onClick={() => window.location.href = '/'}
+                className="guard-schedule-btn"
+                title="Till adminvyn"
+              >
+                <span style={{ fontSize:'18px' }}>⚙️</span>
+                <span>Admin</span>
               </button>
-              <button className="logout-btn" onClick={onSignOut}>Logga ut</button>
-            </div>
-          )}
-        </div>
-
-        <div className="dashboard-content">
-          <NextMatch personnelId={personnelId} />
-          <AssignedMatches
-            assignments={assignments}
-            onEditTimes={setEditingAssignment}
-          />
-          <MyHours personnelId={personnelId} />
-        </div>
+            )}
+            <button className="logout-btn" onClick={onSignOut}>Logga ut</button>
+          </div>
+        )}
       </div>
 
-      {showSchedule && (
-        <ScheduleModal assignments={assignments} onClose={() => setShowSchedule(false)} />
-      )}
+      {/* Content */}
+      <div className="guard-content">
+        <NextMatch personnelId={personnelId} />
+        <AssignedMatches assignments={assignments} onEditTimes={setEditingAssignment} />
+        <MyHours personnelId={personnelId} />
+      </div>
 
+      {showSchedule && <ScheduleModal assignments={assignments} onClose={() => setShowSchedule(false)} />}
       {editingAssignment && (
         <TimeModal
           assignment={editingAssignment}

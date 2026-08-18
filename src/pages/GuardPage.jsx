@@ -22,6 +22,7 @@ export default function GuardPage() {
       personnelId={auth.personnelId}
       personnelName={auth.personnelName}
       onSignOut={auth.signOut}
+      isAdmin={auth.isAdmin}
       embedded={false}
     />
   )

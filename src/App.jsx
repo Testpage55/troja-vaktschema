@@ -59,6 +59,7 @@ export default function App() {
         personnelId={auth.personnelId}
         personnelName={auth.personnelName}
         onSignOut={auth.signOut}
+        isAdmin={false}
         embedded={false}
       />
     )
