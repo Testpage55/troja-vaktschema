@@ -244,7 +244,7 @@ function AttendanceInline({ match }) {
   )
 }
 
-function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, openTimeModal, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible }) {
+function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, openTimeModal, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, currentPersonnelId, onExtrasChanged }) {
   const [search, setSearch] = useState('')
   const matchType = match.match_type || 'home'
   const q = search.toLowerCase()
@@ -309,6 +309,14 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
         </div>
 
         <div style={{ padding: '12px 20px 0' }}>
+          {/* Polis på plats */}
+          {match.police_contact && (
+            <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>🚔 Polis på plats</div>
+              <div style={{ fontSize: '15px', fontWeight: '600', color: '#1e3a8a' }}>{match.police_contact}</div>
+            </div>
+          )}
+
           {/* Säkerhetsansvarig per match */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px 14px', background: match.security_responsible_id ? '#eff6ff' : 'var(--gray-50)', borderRadius: '8px', border: `1px solid ${match.security_responsible_id ? '#bfdbfe' : 'var(--gray-200)'}` }}>
             <span style={{ fontSize: '12px', color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>🛡 Säkerhetsansvarig:</span>
@@ -436,7 +444,7 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
   )
 }
 
-function MatchCard({ match, allPersonnel, isWorking, getWorkHoursForMatch, hasDeviatingHours, getWorkingCount, delegates, onClick }) {
+function MatchCard({ match, allPersonnel, isWorking, getWorkHoursForMatch, hasDeviatingHours, getWorkingCount, delegates, extras, onClick }) {
   const matchType = match.match_type || 'home'
   const workingCount = getWorkingCount(match)
   const required = match.required_guards || 4
@@ -518,6 +526,15 @@ function MatchCard({ match, allPersonnel, isWorking, getWorkHoursForMatch, hasDe
             {matchDelegates.length} delegat{matchDelegates.length > 1 ? 'er' : ''}
           </div>
         )}
+        {match.police_contact && (
+          <span title={`Polis på plats: ${match.police_contact}`} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: '#eff6ff', color: '#1d4ed8', fontWeight: '600', marginLeft: '4px', maxWidth: '100%', overflowWrap: 'anywhere' }}>🚔 Polis – {match.police_contact}</span>
+        )}
+        {extras?.photos > 0 && (
+          <span title="Bilder" style={{ fontSize: '11px', color: 'var(--gray-500)', marginLeft: '4px' }}>📷 {extras.photos}</span>
+        )}
+        {extras?.notes > 0 && (
+          <span title="Dagboksinlägg" style={{ fontSize: '11px', color: 'var(--gray-500)' }}>📝 {extras.notes}</span>
+        )}
       </div>
     </div>
   )
@@ -534,7 +551,7 @@ export default function ScheduleTab({
   hasDeviatingHours, getDetailedTooltip, calculateMileageForMatch,
   toggleWorking, openTimeModal, updateMatch, deleteMatch, onAddMatch,
   delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible,
-  saving
+  saving, currentPersonnelId, matchExtraCounts = {}, onExtrasChanged
 }) {
   const [selectedMatch, setSelectedMatch] = useState(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -616,6 +633,7 @@ export default function ScheduleTab({
                   hasDeviatingHours={hasDeviatingHours}
                   getWorkingCount={getWorkingCount}
                   delegates={delegates}
+                  extras={matchExtraCounts[match.id]}
                   onClick={() => setSelectedMatch(match)}
                 />
               ))}
@@ -642,6 +660,8 @@ export default function ScheduleTab({
           onAddDelegate={onAddDelegate}
           onDeleteDelegate={onDeleteDelegate}
           onUpdateSecurityResponsible={onUpdateSecurityResponsible}
+          currentPersonnelId={currentPersonnelId}
+          onExtrasChanged={onExtrasChanged}
         />
       )}
 

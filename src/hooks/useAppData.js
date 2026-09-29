@@ -15,6 +15,7 @@ export function useAppData() {
   const [workHours, setWorkHours] = useState([])
   const [securityDuties, setSecurityDuties] = useState([])
   const [delegates, setDelegates] = useState([])
+  const [matchExtraCounts, setMatchExtraCounts] = useState({}) // { [matchId]: { notes, photos } }
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -74,19 +75,20 @@ export function useAppData() {
       const autoSecurityDuties = matchesWithSecurity.map(m => {
         const person = personnelData?.find(p => p.id === m.security_responsible_id)
         if (!person) return null
-        // Beräkna timmar från work_hours om de finns, annars standard 4.5h
+        // Om vakten redan har ett arbetspass på matchen ingår säkerhetsansvaret i det passet:
+        // timmarna räknas då bara en gång (i work_hours). Saknas arbetspass används standard 4.5h.
         const wh = hoursData?.find(h => h.match_id === m.id && h.personnel_id === m.security_responsible_id)
-        const hours = wh ? parseFloat(((timeToMinutes(wh.end_time) - timeToMinutes(wh.start_time) + 1440) % 1440 / 60).toFixed(1)) : 4.5
         return {
           id: `auto_${m.id}`,
           date: m.date,
           opponent: m.opponent,
           personnel_name: person.name,
-          hours,
+          hours: wh ? 0 : 4.5,
           mileage_compensation: m.match_type === 'away' && m.distance_miles ? m.distance_miles * 2 * 25 : 0,
           season: m.season,
-          notes: null,
+          notes: wh ? 'Timmar ingår i vaktpasset' : null,
           auto: true,
+          coveredByShift: !!wh,
         }
       }).filter(Boolean)
 
@@ -112,11 +114,27 @@ export function useAppData() {
       ].sort((a, b) => new Date(b.date) - new Date(a.date))
       setSecurityDuties(combined)
       setDelegates(delegatesData || [])
+      refreshMatchExtraCounts()
     } catch (error) {
       console.error('Error:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Antal dagboksinlägg och bilder per match (tyst fel om tabellerna inte finns än)
+  const refreshMatchExtraCounts = async () => {
+    try {
+      const [n, ph] = await Promise.all([
+        supabase.from('match_notes').select('match_id'),
+        supabase.from('match_photos').select('match_id'),
+      ])
+      if (n.error || ph.error) return
+      const counts = {}
+      ;(n.data || []).forEach(r => { counts[r.match_id] = { notes: 0, photos: 0, ...counts[r.match_id] }; counts[r.match_id].notes++ })
+      ;(ph.data || []).forEach(r => { counts[r.match_id] = { notes: 0, photos: 0, ...counts[r.match_id] }; counts[r.match_id].photos++ })
+      setMatchExtraCounts(counts)
+    } catch (e) { /* ignoreras */ }
   }
 
   // ─── Toast ────────────────────────────────────────────────────────────────
@@ -524,6 +542,17 @@ export function useAppData() {
     } catch (error) { showToast('Fel vid uppdatering av roll', 'error') }
   }
 
+  const updatePersonnelCommute = async (personnelId, miles, getsMileage) => {
+    const { error } = await supabase
+      .from('personnel')
+      .update({ commute_miles: miles, gets_mileage: !!getsMileage })
+      .eq('id', personnelId)
+    if (error) { showToast('Kunde inte spara (har kolumnerna commute_miles och gets_mileage skapats?)', 'error'); return false }
+    showToast('Sparat', 'success')
+    fetchData()
+    return true
+  }
+
   // ─── Export ───────────────────────────────────────────────────────────────
 
   const exportWorkHours = (personnelId = null) => {
@@ -614,6 +643,7 @@ export function useAppData() {
 
   return {
     matches, personnel, workHours, securityDuties, delegates,
+    matchExtraCounts, refreshMatchExtraCounts,
     loading, saving,
     matchFilter, setMatchFilter,
     categoryFilter, setCategoryFilter,
@@ -640,7 +670,7 @@ export function useAppData() {
     openAddSecurityDutyModal, openEditSecurityDutyModal,
     updateMatchSecurityResponsible,
     addDelegate, deleteDelegate,
-    updatePersonnelRole,
+    updatePersonnelRole, updatePersonnelCommute,
     exportWorkHours,
     regularPersonnel, extraPersonnel, personnelStatsData,
     totalMatchesWorked, totalSecurityDuties,

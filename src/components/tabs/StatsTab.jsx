@@ -57,6 +57,8 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
       name: person.name,
       matches: personMatches.length,
       securityDuties: secForPerson.length,
+      // Säkerhetsansvar som ingår i ett vaktpass är inte ett eget arbetstillfälle
+      shifts: personMatches.length + secForPerson.filter(d => !d.coveredByShift).length,
       hours: totalHours,
       securityHours: secHours,
       salary: totalHours * HOURLY_RATE,
@@ -75,7 +77,8 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
   const totalSalary = totalAllHours * HOURLY_RATE
   const totalMileage = filteredSecurityDuties.reduce((t, d) => t + (d.mileage_compensation || 0), 0)
   const totalCompensation = totalSalary + totalMileage
-  const totalShifts = filteredWorkHours.length + filteredSecurityDuties.length
+  const separateSecurity = filteredSecurityDuties.filter(d => !d.coveredByShift).length
+  const totalShifts = filteredWorkHours.length + separateSecurity
 
   const hasFilter = seasonFilter !== 'all' || categoryFilter !== 'all' || fromDate || toDate
 
@@ -121,7 +124,7 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {[
           { label: 'Evenemang', value: totalEvents, sub: null, bg: '#4f46e5' },
-          { label: 'Arbetstillfällen', value: totalShifts, sub: `${filteredWorkHours.length} vakt + ${filteredSecurityDuties.length} säkerhet`, bg: '#db2777' },
+          { label: 'Arbetstillfällen', value: totalShifts, sub: `${filteredWorkHours.length} vakt + ${separateSecurity} separat säkerhet`, bg: '#db2777' },
           { label: 'Totala timmar', value: `${totalAllHours.toFixed(1)}h`, sub: totalShifts > 0 ? `Snitt ${(totalAllHours / totalShifts).toFixed(1)}h/tillfälle` : null, bg: '#0891b2' },
           { label: 'Total kostnad', value: `${totalCompensation.toLocaleString('sv-SE')} kr`, sub: `Lön ${totalSalary.toLocaleString('sv-SE')} kr`, bg: '#dc2626' },
           { label: 'Delegatbesök', value: filteredDelegates.length, sub: uniqueDelegateNames.length > 0 ? `${uniqueDelegateNames.length} unika` : null, bg: '#2563eb' },
@@ -161,7 +164,7 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
                 <tr>
                   <th>Namn</th>
                   <th>Vaktpass</th>
-                  <th>Säkerhetsuppdrag</th>
+                  <th title="Antal gånger som säkerhetsansvarig (ingår i vaktpasset när vakten även jobbat)">Säkerhetsansv.</th>
                   <th>Totala timmar</th>
                   <th>Lön</th>
                   <th>Milersättning</th>
@@ -185,8 +188,8 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
                     <td className="text-center"><strong>{person.mileage.toLocaleString('sv-SE')} kr</strong></td>
                     <td className="text-center"><strong className="total-compensation">{person.totalCompensation.toLocaleString('sv-SE')} kr</strong></td>
                     <td className="text-center">
-                      {(person.matches + person.securityDuties) > 0
-                        ? (person.hours / (person.matches + person.securityDuties)).toFixed(1)
+                      {person.shifts > 0
+                        ? (person.hours / person.shifts).toFixed(1)
                         : 0}h
                     </td>
                   </tr>

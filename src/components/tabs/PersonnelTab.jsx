@@ -1,15 +1,40 @@
 import { useState, useEffect } from 'react'
-import { HOURLY_RATE } from '../../constants'
+import { HOURLY_RATE, MILEAGE_RATE } from '../../constants'
+
+// Innevarande säsong: börjar i juli (juli 2026 → "2026/2027"). Finns den inte bland säsongerna
+// används den senaste som finns.
+function getCurrentSeason(availableSeasons = []) {
+  const now = new Date()
+  const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1
+  const current = `${y}/${y + 1}`
+  if (availableSeasons.includes(current)) return current
+  return [...availableSeasons].sort().reverse()[0] || 'all'
+}
 
 function getInitials(name) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function PersonDetailModal({ person, workHours, securityDuties, onClose, onExport, onDelete, isRegular, saving }) {
+function PersonDetailModal({ person, workHours, securityDuties, onClose, onExport, onDelete, onUpdateCommute, isRegular, saving, initialSeason = 'all' }) {
+  const [commuteInput, setCommuteInput] = useState(person.commute_miles != null ? String(person.commute_miles).replace('.', ',') : '')
+  const [commuteSaved, setCommuteSaved] = useState(person.commute_miles ?? null)
+  const [getsMileage, setGetsMileage] = useState(!!person.gets_mileage)
+  const [savedGetsMileage, setSavedGetsMileage] = useState(!!person.gets_mileage)
+  const [savingCommute, setSavingCommute] = useState(false)
+  const parsedCommute = commuteInput.trim() === '' ? null : parseFloat(commuteInput.replace(',', '.'))
+  const commuteValid = parsedCommute === null || (!isNaN(parsedCommute) && parsedCommute >= 0)
+  const commuteDirty = commuteValid && (parsedCommute !== commuteSaved || getsMileage !== savedGetsMileage)
+  const saveCommute = async () => {
+    if (!commuteValid || !onUpdateCommute) return
+    setSavingCommute(true)
+    const ok = await onUpdateCommute(person.id, parsedCommute, getsMileage)
+    if (ok) { setCommuteSaved(parsedCommute); setSavedGetsMileage(getsMileage) }
+    setSavingCommute(false)
+  }
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
-  const [seasonFilter, setSeasonFilter] = useState('all')
+  const [seasonFilter, setSeasonFilter] = useState(initialSeason)
 
   const personWorkHours = workHours.filter(wh => wh.personnel_id === person.id)
   const personSecurityDuties = securityDuties.filter(d => d.personnel_name === person.name)
@@ -94,6 +119,30 @@ function PersonDetailModal({ person, workHours, securityDuties, onClose, onExpor
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: 'var(--gray-500)' }}>×</button>
         </div>
 
+        {/* Mil till jobbet */}
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--gray-100)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: '13px', color: 'var(--gray-600)', fontWeight: '600' }}>🚗 Mil till jobbet (enkel resa)</label>
+          <input
+            type="text" inputMode="decimal" value={commuteInput}
+            onChange={e => setCommuteInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && commuteDirty && saveCommute()}
+            placeholder="t.ex. 3,5"
+            style={{ width: '90px', padding: '6px 10px', border: `1px solid ${commuteValid ? 'var(--gray-200)' : '#fca5a5'}`, borderRadius: '6px', fontSize: '14px' }}
+          />
+          <span style={{ fontSize: '13px', color: 'var(--gray-500)' }}>mil</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--gray-600)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={getsMileage} onChange={e => setGetsMileage(e.target.checked)} />
+            Får milersättning (tur/retur, {MILEAGE_RATE} kr/mil)
+          </label>
+          <button
+            onClick={saveCommute}
+            disabled={!commuteDirty || savingCommute}
+            style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: '#16a34a', color: 'white', fontWeight: '600', fontSize: '13px', cursor: 'pointer', opacity: !commuteDirty ? 0.4 : 1 }}
+          >
+            {savingCommute ? 'Sparar…' : 'Spara'}
+          </button>
+        </div>
+
         {/* Statistik-chips */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', padding: '16px 24px', borderBottom: '1px solid var(--gray-100)' }}>
           {[
@@ -116,7 +165,7 @@ function PersonDetailModal({ person, workHours, securityDuties, onClose, onExpor
             <option value="security">Säkerhetsansvarig</option>
           </select>
           {availableSeasons.length > 0 && (
-            <select value={seasonFilter} onChange={e => handleSeasonChange(e.target.value)} className="filter-select" style={{ fontSize: '13px' }}>
+            <select value={seasonFilter} onChange={e => setSeasonFilter(e.target.value)} className="filter-select" style={{ fontSize: '13px' }}>
               <option value="all">Alla säsonger</option>
               {availableSeasons.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -262,6 +311,7 @@ function PersonCard({ person, totalHours, securityHours, isRegular, lastShift, s
             : shiftCount !== null
             ? `${shiftCount} pass totalt`
             : isRegular ? 'Ordinarie' : 'Extra'}
+          {person.commute_miles != null && ` · 🚗 ${String(person.commute_miles).replace('.', ',')} mil`}{person.gets_mileage && ' · milersättning'}
         </div>
       </div>
       <div style={{ textAlign: 'right' }} onClick={onClick}>
@@ -293,27 +343,15 @@ export default function PersonnelTab({
   availableSeasons,
   getTotalHoursForPerson, getSecurityHoursForPerson, getTotalAllHoursForPerson,
   addPersonnel, deletePersonnel, exportWorkHours,
-  updatePersonnelRole,
+  updatePersonnelRole, updatePersonnelCommute,
   saving
 }) {
   const [selectedPerson, setSelectedPerson] = useState(null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('name')
-  const [seasonFilter, setSeasonFilter] = useState('all')
-  useEffect(() => {
-    if (availableSeasons?.length > 0 && seasonFilter === 'all') {
-      const saved = localStorage.getItem('troja_default_season')
-      const current = (saved && availableSeasons.includes(saved))
-        ? saved
-        : availableSeasons.find(s => s.includes(String(new Date().getFullYear()))) || availableSeasons.sort().reverse()[0]
-      setSeasonFilter(current)
-    }
-  }, [availableSeasons])
-
-  const handleSeasonChange = (val) => {
-    setSeasonFilter(val)
-    if (val !== 'all') localStorage.setItem('troja_default_season', val)
-  }
+  const currentSeason = getCurrentSeason(availableSeasons)
+  const [seasonFilter, setSeasonFilter] = useState(currentSeason)
+  const handleSeasonChange = (val) => setSeasonFilter(val)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
 
@@ -420,8 +458,8 @@ export default function PersonnelTab({
           <option value="shifts">Sortera: Antal pass</option>
           <option value="lastShift">Sortera: Senaste pass</option>
         </select>
-        {(fromDate || toDate || seasonFilter !== 'all') && (          <button
-            onClick={() => { setFromDate(''); setToDate(''); setSeasonFilter('all') }}
+        {(fromDate || toDate || seasonFilter !== currentSeason) && (          <button
+            onClick={() => { setFromDate(''); setToDate(''); setSeasonFilter(currentSeason) }}
             style={{ fontSize: '12px', color: 'var(--gray-500)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap' }}
           >
             Rensa filter
@@ -456,9 +494,11 @@ export default function PersonnelTab({
           workHours={workHours}
           securityDuties={securityDuties}
           isRegular={isRegular(selectedPerson)}
+          initialSeason={seasonFilter}
           onClose={() => setSelectedPerson(null)}
           onExport={exportWorkHours}
           onDelete={(id, name) => { deletePersonnel(id, name); setSelectedPerson(null) }}
+          onUpdateCommute={updatePersonnelCommute}
           saving={saving}
         />
       )}

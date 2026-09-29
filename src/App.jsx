@@ -15,6 +15,7 @@ import PersonnelTab from './components/tabs/PersonnelTab'
 import WorkHoursTab from './components/tabs/WorkHoursTab'
 import SecurityTab from './components/tabs/SecurityTab'
 import StatsTab from './components/tabs/StatsTab'
+import FairnessTab from './components/tabs/FairnessTab'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('schedule')
@@ -119,6 +120,7 @@ export default function App() {
           { key: 'hours', label: 'Arbetstider' },
           { key: 'security', label: 'Säkerhetsansvarig' },
           { key: 'stats', label: 'Statistik' },
+          { key: 'fairness', label: 'Rättvisa' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -163,6 +165,9 @@ export default function App() {
           onDeleteDelegate={data.deleteDelegate}
           onUpdateSecurityResponsible={data.updateMatchSecurityResponsible}
           saving={data.saving}
+          currentPersonnelId={auth.personnelId}
+          matchExtraCounts={data.matchExtraCounts}
+          onExtrasChanged={data.refreshMatchExtraCounts}
         />
       )}
 
@@ -182,12 +187,14 @@ export default function App() {
           deletePersonnel={data.deletePersonnel}
           exportWorkHours={data.exportWorkHours}
           updatePersonnelRole={data.updatePersonnelRole}
+          updatePersonnelCommute={data.updatePersonnelCommute}
           saving={data.saving}
         />
       )}
 
       {activeTab === 'hours' && (
         <WorkHoursTab
+          personnel={data.personnel}
           workHours={data.workHours}
           securityDuties={data.securityDuties}
           allWorkEntries={data.allWorkEntries}
@@ -225,6 +232,17 @@ export default function App() {
         />
       )}
 
+      {activeTab === 'fairness' && (
+        <FairnessTab
+          matches={data.matches}
+          securityDuties={data.securityDuties}
+          personnel={data.personnel}
+          workHours={data.workHours}
+          seasonFilter={data.seasonFilter}
+          setSeasonFilter={data.setSeasonFilter}
+          availableSeasons={data.availableSeasons}
+        />
+      )}
 
       <AddMatchModal
         isOpen={data.isAddMatchModalOpen}
