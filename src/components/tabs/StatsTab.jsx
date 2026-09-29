@@ -38,9 +38,16 @@ function DelegateReportCell({ delegate, onChanged }) {
   }
 
   const open = async () => {
+    // Fliken öppnas direkt vid klicket (annars blockerar mobilens popup-skydd den)
+    const win = window.open('', '_blank')
     const { data, error: err } = await supabase.storage.from(REPORT_BUCKET).createSignedUrl(delegate.report_path, 300)
-    if (err || !data?.signedUrl) { setError('Kunde inte öppna filen'); return }
-    window.open(data.signedUrl, '_blank', 'noopener')
+    if (err || !data?.signedUrl) {
+      if (win) win.close()
+      setError('Kunde inte öppna filen')
+      return
+    }
+    if (win) win.location.href = data.signedUrl
+    else window.location.href = data.signedUrl // om popup ändå blockeras: öppna i samma flik
   }
 
   const remove = async () => {
