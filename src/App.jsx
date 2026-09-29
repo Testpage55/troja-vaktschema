@@ -228,6 +228,7 @@ export default function App() {
           securityDuties={data.securityDuties}
           personnel={data.personnel}
           delegates={data.delegates}
+          onDelegateReportChanged={data.refreshData}
           seasonFilter={data.seasonFilter}
           setSeasonFilter={data.setSeasonFilter}
           availableSeasons={data.availableSeasons}

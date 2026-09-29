@@ -1,8 +1,82 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { HOURLY_RATE, MILEAGE_RATE } from '../../constants'
+import { supabase } from '../../lib/supabase'
 
-export default function StatsTab({ matches, workHours, securityDuties, personnel, delegates, seasonFilter, setSeasonFilter, availableSeasons: availableSeasonsProp }) {
+const REPORT_BUCKET = 'delegate-reports'
+const MAX_REPORT_MB = 15
+
+// Storage-nycklar tål inte å/ä/ö och specialtecken
+const safeFileName = (name) =>
+  name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_')
+
+// Rapportkolumn per delegatbesök: ladda upp, öppna, byt ut, ta bort
+function DelegateReportCell({ delegate, onChanged }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const inputRef = useRef(null)
+
+  const upload = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > MAX_REPORT_MB * 1024 * 1024) { setError(`Filen är för stor (max ${MAX_REPORT_MB} MB)`); return }
+    setBusy(true); setError('')
+    const oldPath = delegate.report_path
+    const path = `${delegate.id}/${Date.now()}_${safeFileName(file.name)}`
+    const { error: upErr } = await supabase.storage.from(REPORT_BUCKET).upload(path, file, { contentType: file.type || undefined })
+    if (upErr) { console.error(upErr); setError('Uppladdningen misslyckades'); setBusy(false); return }
+    const { error: dbErr } = await supabase.from('delegates').update({ report_path: path, report_name: file.name }).eq('id', delegate.id)
+    if (dbErr) {
+      console.error(dbErr)
+      await supabase.storage.from(REPORT_BUCKET).remove([path])
+      setError('Kunde inte spara (har SQL-kolumnerna skapats?)'); setBusy(false); return
+    }
+    if (oldPath) await supabase.storage.from(REPORT_BUCKET).remove([oldPath])
+    setBusy(false)
+    onChanged && onChanged()
+  }
+
+  const open = async () => {
+    const { data, error: err } = await supabase.storage.from(REPORT_BUCKET).createSignedUrl(delegate.report_path, 300)
+    if (err || !data?.signedUrl) { setError('Kunde inte öppna filen'); return }
+    window.open(data.signedUrl, '_blank', 'noopener')
+  }
+
+  const remove = async () => {
+    if (!window.confirm('Ta bort delegatrapporten?')) return
+    setBusy(true); setError('')
+    const { error: dbErr } = await supabase.from('delegates').update({ report_path: null, report_name: null }).eq('id', delegate.id)
+    if (dbErr) { setError('Kunde inte ta bort'); setBusy(false); return }
+    await supabase.storage.from(REPORT_BUCKET).remove([delegate.report_path])
+    setBusy(false)
+    onChanged && onChanged()
+  }
+
+  const btn = { fontSize: '12px', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', background: 'white' }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+      {delegate.report_path ? (
+        <>
+          <button onClick={open} disabled={busy} title={delegate.report_name} style={{ ...btn, border: '1px solid #2563eb', color: '#1d4ed8', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            📄 {delegate.report_name || 'Öppna rapport'}
+          </button>
+          <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...btn, border: '1px solid var(--gray-300)', color: 'var(--gray-600)' }}>Byt</button>
+          <button onClick={remove} disabled={busy} style={{ ...btn, border: '1px solid #fca5a5', color: '#b91c1c' }}>Ta bort</button>
+        </>
+      ) : (
+        <button onClick={() => inputRef.current?.click()} disabled={busy} style={{ ...btn, border: '1px solid #16a34a', color: '#15803d' }}>
+          {busy ? 'Laddar upp…' : '+ Ladda upp rapport'}
+        </button>
+      )}
+      <input ref={inputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,image/*" onChange={upload} style={{ display: 'none' }} />
+      {error && <div style={{ width: '100%', fontSize: '11px', color: '#b91c1c' }}>{error}</div>}
+    </div>
+  )
+}
+
+export default function StatsTab({ matches, workHours, securityDuties, personnel, delegates, onDelegateReportChanged, seasonFilter, setSeasonFilter, availableSeasons: availableSeasonsProp }) {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -216,6 +290,7 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
                   <th>Evenemang</th>
                   <th>Delegat</th>
                   <th>Anteckning</th>
+                  <th>Delegatrapport</th>
                 </tr>
               </thead>
               <tbody>
@@ -231,6 +306,7 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
                         </span>
                       </td>
                       <td style={{ fontSize: '13px', color: 'var(--gray-500)' }}>{d.notes || '-'}</td>
+                      <td><DelegateReportCell delegate={d} onChanged={onDelegateReportChanged} /></td>
                     </tr>
                   )
                 })}

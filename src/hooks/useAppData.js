@@ -654,7 +654,7 @@ export function useAppData() {
 
   return {
     matches, personnel, workHours, securityDuties, delegates,
-    matchExtraCounts, refreshMatchExtraCounts,
+    matchExtraCounts, refreshMatchExtraCounts, refreshData: fetchData,
     loading, saving,
     matchFilter, setMatchFilter,
     categoryFilter, setCategoryFilter,
