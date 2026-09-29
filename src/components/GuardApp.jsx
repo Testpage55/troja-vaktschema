@@ -143,6 +143,7 @@ function MatchPersonnelModal({ match, onClose }) {
   const [attendanceInput, setAttendanceInput] = useState('')
   const [editingAttendance, setEditingAttendance] = useState(false)
   const [savingAttendance, setSavingAttendance] = useState(false)
+  const [policeContact, setPoliceContact] = useState(null)
 
   useEffect(() => { if (match) fetchPersonnel() }, [match])
 
@@ -150,12 +151,13 @@ function MatchPersonnelModal({ match, onClose }) {
     const [{ data: asgn }, { data: hours }, { data: matchData }] = await Promise.all([
       supabase.from('assignments').select('*, personnel(*)').eq('match_id', match.id).eq('is_working', true),
       supabase.from('work_hours').select('*').eq('match_id', match.id),
-      supabase.from('matches').select('security_responsible_id, attendance').eq('id', match.id).single(),
+      supabase.from('matches').select('security_responsible_id, attendance, police_contact').eq('id', match.id).single(),
     ])
     setSecurityId(matchData?.security_responsible_id || null)
     setAttendance(matchData?.attendance || null)
     setAttendanceInput(matchData?.attendance ? String(matchData.attendance) : '')
     setEditingAttendance(!matchData?.attendance)
+    setPoliceContact(matchData?.police_contact || null)
     const list = (asgn || [])
       .filter(a => a.personnel)
       .map(a => ({
@@ -254,6 +256,16 @@ function MatchPersonnelModal({ match, onClose }) {
             </div>
           )}
         </div>
+
+        {/* Poliskontakt */}
+        {policeContact && (
+          <div style={{ margin:'0 20px 16px', padding:'12px 14px', background:'#eff6ff', borderRadius:'14px', border:'1px solid #bfdbfe' }}>
+            <div style={{ fontSize:'11px', fontWeight:'700', color:'#1d4ed8', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'6px' }}>
+              🚔 Polis på plats
+            </div>
+            <div style={{ fontSize:'15px', fontWeight:'600', color:'#1e3a8a' }}>{policeContact}</div>
+          </div>
+        )}
 
         {/* Personnel list */}
         <div style={{ padding:'0 20px 32px', overflowY:'auto', flex:1 }}>

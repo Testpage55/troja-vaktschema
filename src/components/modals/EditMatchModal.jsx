@@ -31,6 +31,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
   const [season, setSeason] = useState(DEFAULT_SEASONS[0])
   const [customSeason, setCustomSeason] = useState('')
   const [attendance, setAttendance] = useState('')
+  const [policeContact, setPoliceContact] = useState('')
   const [saving, setSaving] = useState(false)
 
   // time = matchstart i databasen
@@ -50,6 +51,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       setSeason(match.season || DEFAULT_SEASONS[0])
       setCustomSeason('')
       setAttendance(match.attendance ? String(match.attendance) : '')
+      setPoliceContact(match.police_contact || '')
     }
   }, [match])
 
@@ -77,6 +79,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       category: finalCategory || null,
       season: finalSeason || null,
       attendance: attendance ? parseInt(attendance) : null,
+      police_contact: policeContact.trim() || null,
     })
     setSaving(false)
     onClose()
@@ -207,6 +210,18 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
               onChange={e => setAttendance(e.target.value)}
               className="form-input"
               placeholder="Antal åskådare (valfritt)"
+            />
+          </div>
+
+          {/* Poliskontakt */}
+          <div className="form-group">
+            <label>Poliskontakt (valfritt)</label>
+            <input
+              type="text"
+              value={policeContact}
+              onChange={e => setPoliceContact(e.target.value)}
+              className="form-input"
+              placeholder="t.ex. Anna Svensson, Polisen Kronoberg"
             />
           </div>
 
