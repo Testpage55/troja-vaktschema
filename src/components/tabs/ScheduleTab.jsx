@@ -24,6 +24,7 @@ function PersonRow({ person, match, toggleWorking, saving }) {
       <div style={{ flex: 1, fontSize: '14px', color: 'var(--gray-700)' }}>
         {person.name}
         {isSecResp && <span style={{ fontSize: '10px', marginLeft: '6px', color: '#2563eb', background: '#dbeafe', padding: '1px 6px', borderRadius: '99px' }}>Säkerhetsansvarig</span>}
+        {match.deputy_security_responsible_id == person.id && <span style={{ fontSize: '10px', marginLeft: '6px', color: '#1d4ed8', background: '#e0f2fe', padding: '1px 6px', borderRadius: '99px' }}>Ställföreträdande</span>}
       </div>
       <button onClick={() => toggleWorking(match.id, person.id)} disabled={saving}
         style={{ fontSize: '12px', padding: '5px 12px', border: '1px solid #16a34a', borderRadius: '6px', background: 'white', color: '#15803d', cursor: 'pointer', fontWeight: '500' }}>
@@ -244,7 +245,7 @@ function AttendanceInline({ match }) {
   )
 }
 
-function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, openTimeModal, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, currentPersonnelId, onExtrasChanged }) {
+function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, openTimeModal, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, onUpdateDeputySecurityResponsible, currentPersonnelId, onExtrasChanged }) {
   const [search, setSearch] = useState('')
   const matchType = match.match_type || 'home'
   const q = search.toLowerCase()
@@ -309,6 +310,13 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
         </div>
 
         <div style={{ padding: '12px 20px 0' }}>
+          {/* Inget matavdrag */}
+          {match.no_meal_deduction && (
+            <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a', fontSize: '14px', fontWeight: '600', color: '#92400e' }}>
+              🍽 Inget matavdrag på den här matchen
+            </div>
+          )}
+
           {/* Polis på plats */}
           {match.police_contact && (
             <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
@@ -333,6 +341,28 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
               <option value="">— Ingen vald —</option>
               {allPersonnel
                 .filter(p => SECURITY_RESPONSIBLE.includes(p.name))
+                .map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+            </select>
+          </div>
+
+          {/* Ställföreträdande säkerhetsansvarig */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px 14px', background: match.deputy_security_responsible_id ? '#f0f9ff' : 'var(--gray-50)', borderRadius: '8px', border: `1px solid ${match.deputy_security_responsible_id ? '#bae6fd' : 'var(--gray-200)'}` }}>
+            <span style={{ fontSize: '12px', color: 'var(--gray-500)', whiteSpace: 'nowrap' }}>🛡 Ställföreträdande:</span>
+            <select
+              value={match.deputy_security_responsible_id || ''}
+              onChange={e => onUpdateDeputySecurityResponsible && onUpdateDeputySecurityResponsible(match.id, e.target.value || null)}
+              style={{
+                flex: 1, padding: '5px 10px', border: '1px solid var(--gray-200)', borderRadius: '8px',
+                fontSize: '13px', background: 'white',
+                color: match.deputy_security_responsible_id ? '#0369a1' : 'var(--gray-600)',
+                fontWeight: match.deputy_security_responsible_id ? '600' : '400'
+              }}
+            >
+              <option value="">— Ingen vald —</option>
+              {allPersonnel
+                .filter(p => isWorking(match, p.id) && p.id != match.security_responsible_id)
                 .map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -390,6 +420,7 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
                       <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-900)' }}>
                         {person.name}
                         {isSecResp && <span style={{ fontSize: '10px', marginLeft: '6px', color: '#2563eb', background: '#dbeafe', padding: '1px 6px', borderRadius: '99px' }}>Säkerhetsansvarig</span>}
+                        {match.deputy_security_responsible_id == person.id && <span style={{ fontSize: '10px', marginLeft: '6px', color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '99px' }}>Ställföreträdande</span>}
                       </div>
                       {wh && (
                         <div style={{ fontSize: '12px', color: deviating ? '#d97706' : (isSecResp ? '#2563eb' : '#16a34a') }}>
@@ -496,10 +527,11 @@ function MatchCard({ match, allPersonnel, isWorking, getWorkHoursForMatch, hasDe
         {workingPersonnel.map(person => (
           <div
             key={person.id}
-            title={person.name}
+            title={match.deputy_security_responsible_id == person.id ? `${person.name} (ställföreträdande säkerhetsansvarig)` : person.name}
             style={{
               width: '30px', height: '30px', borderRadius: '50%',
-              background: match.security_responsible_id == person.id ? '#2563eb' : '#16a34a',
+              background: match.security_responsible_id == person.id ? '#2563eb' : (match.deputy_security_responsible_id == person.id ? '#38bdf8' : '#16a34a'),
+              outline: match.deputy_security_responsible_id == person.id ? '2px solid #bae6fd' : 'none',
               color: 'white',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '10px', fontWeight: '600'
@@ -526,6 +558,9 @@ function MatchCard({ match, allPersonnel, isWorking, getWorkHoursForMatch, hasDe
             {matchDelegates.length} delegat{matchDelegates.length > 1 ? 'er' : ''}
           </div>
         )}
+        {match.no_meal_deduction && (
+          <span title="Inget matavdrag på den här matchen" style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: '#fef3c7', color: '#92400e', fontWeight: '600', marginLeft: '4px' }}>🍽 Inget matavdrag</span>
+        )}
         {match.police_contact && (
           <span title={`Polis på plats: ${match.police_contact}`} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '99px', background: '#eff6ff', color: '#1d4ed8', fontWeight: '600', marginLeft: '4px', maxWidth: '100%', overflowWrap: 'anywhere' }}>🚔 Polis – {match.police_contact}</span>
         )}
@@ -550,7 +585,7 @@ export default function ScheduleTab({
   isWorking, getWorkingCount, hasWorkHours, getWorkHoursForMatch,
   hasDeviatingHours, getDetailedTooltip, calculateMileageForMatch,
   toggleWorking, openTimeModal, updateMatch, deleteMatch, onAddMatch,
-  delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible,
+  delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, onUpdateDeputySecurityResponsible,
   saving, currentPersonnelId, matchExtraCounts = {}, onExtrasChanged
 }) {
   const [selectedMatch, setSelectedMatch] = useState(null)
@@ -660,6 +695,7 @@ export default function ScheduleTab({
           onAddDelegate={onAddDelegate}
           onDeleteDelegate={onDeleteDelegate}
           onUpdateSecurityResponsible={onUpdateSecurityResponsible}
+          onUpdateDeputySecurityResponsible={onUpdateDeputySecurityResponsible}
           currentPersonnelId={currentPersonnelId}
           onExtrasChanged={onExtrasChanged}
         />

@@ -183,7 +183,8 @@ export function useAppData() {
   const updateMatch = async (matchId, matchData) => {
     setSaving(true)
     try {
-      await supabase.from('matches').update(matchData).eq('id', matchId)
+      const { error } = await supabase.from('matches').update(matchData).eq('id', matchId)
+      if (error) throw error
       fetchData()
       showToast('Evenemang uppdaterat', 'success')
     } catch (error) {
@@ -493,12 +494,22 @@ export function useAppData() {
 
   const updateMatchSecurityResponsible = async (matchId, personnelId) => {
     try {
-      await supabase
-        .from('matches')
-        .update({ security_responsible_id: personnelId || null })
-        .eq('id', matchId)
+      const update = { security_responsible_id: personnelId || null }
+      // Samma person kan inte vara både ansvarig och ställföreträdare
+      const match = matches.find(m => m.id === matchId)
+      if (personnelId && match?.deputy_security_responsible_id == personnelId) update.deputy_security_responsible_id = null
+      await supabase.from('matches').update(update).eq('id', matchId)
       fetchData()
     } catch (error) { showToast('Fel vid uppdatering av säkerhetsansvarig', 'error') }
+  }
+
+  const updateMatchDeputySecurityResponsible = async (matchId, personnelId) => {
+    const { error } = await supabase
+      .from('matches')
+      .update({ deputy_security_responsible_id: personnelId || null })
+      .eq('id', matchId)
+    if (error) { showToast('Kunde inte spara ställföreträdare (har kolumnen deputy_security_responsible_id skapats?)', 'error'); return }
+    fetchData()
   }
 
   // ─── Delegates ────────────────────────────────────────────────────────────
@@ -668,7 +679,7 @@ export function useAppData() {
     toggleWorking,
     saveSecurityDuty, deleteSecurityDuty,
     openAddSecurityDutyModal, openEditSecurityDutyModal,
-    updateMatchSecurityResponsible,
+    updateMatchSecurityResponsible, updateMatchDeputySecurityResponsible,
     addDelegate, deleteDelegate,
     updatePersonnelRole, updatePersonnelCommute,
     exportWorkHours,

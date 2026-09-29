@@ -164,6 +164,7 @@ export default function App() {
           onAddDelegate={data.addDelegate}
           onDeleteDelegate={data.deleteDelegate}
           onUpdateSecurityResponsible={data.updateMatchSecurityResponsible}
+          onUpdateDeputySecurityResponsible={data.updateMatchDeputySecurityResponsible}
           saving={data.saving}
           currentPersonnelId={auth.personnelId}
           matchExtraCounts={data.matchExtraCounts}
@@ -194,6 +195,7 @@ export default function App() {
 
       {activeTab === 'hours' && (
         <WorkHoursTab
+          matches={data.matches}
           personnel={data.personnel}
           workHours={data.workHours}
           securityDuties={data.securityDuties}

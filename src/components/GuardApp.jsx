@@ -135,9 +135,10 @@ function NextMatch({ personnelId }) {
 
 // ─── MatchPersonnelModal ──────────────────────────────────────────────────────
 
-function MatchPersonnelModal({ match, onClose }) {
+function MatchPersonnelModal({ match, onClose, personnelId, isAdmin }) {
   const [personnel, setPersonnel] = useState([])
   const [securityId, setSecurityId] = useState(null)
+  const [deputyId, setDeputyId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [attendance, setAttendance] = useState(null)
   const [attendanceInput, setAttendanceInput] = useState('')
@@ -151,9 +152,10 @@ function MatchPersonnelModal({ match, onClose }) {
     const [{ data: asgn }, { data: hours }, { data: matchData }] = await Promise.all([
       supabase.from('assignments').select('*, personnel(*)').eq('match_id', match.id).eq('is_working', true),
       supabase.from('work_hours').select('*').eq('match_id', match.id),
-      supabase.from('matches').select('security_responsible_id, attendance, police_contact').eq('id', match.id).single(),
+      supabase.from('matches').select('*').eq('id', match.id).single(),
     ])
     setSecurityId(matchData?.security_responsible_id || null)
+    setDeputyId(matchData?.deputy_security_responsible_id || null)
     setAttendance(matchData?.attendance || null)
     setAttendanceInput(matchData?.attendance ? String(matchData.attendance) : '')
     setEditingAttendance(!matchData?.attendance)
@@ -298,6 +300,9 @@ function MatchPersonnelModal({ match, onClose }) {
                         <span style={{ fontWeight:'700', fontSize:'15px', color:'#1a202c' }}>{p.name}</span>
                         {isSecurity && (
                           <span style={{ fontSize:'10px', fontWeight:'700', background:'#1d4ed8', color:'white', padding:'2px 7px', borderRadius:'99px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Säk.ansvarig</span>
+                        )}
+                        {p.personnelId === deputyId && (
+                          <span style={{ fontSize:'10px', fontWeight:'700', background:'#0284c7', color:'white', padding:'2px 7px', borderRadius:'99px', textTransform:'uppercase', letterSpacing:'0.05em' }}>Ställföreträdande</span>
                         )}
                       </div>
                       {wh ? (
@@ -627,7 +632,7 @@ function MyHours({ personnelId }) {
 
 // ─── AssignedMatches ──────────────────────────────────────────────────────────
 
-function AssignedMatches({ assignments, onEditTimes }) {
+function AssignedMatches({ assignments, onEditTimes, personnelId, isAdmin }) {
   const [selectedMatch, setSelectedMatch] = useState(null)
   const [showAll, setShowAll] = useState(false)
 
@@ -702,7 +707,7 @@ function AssignedMatches({ assignments, onEditTimes }) {
         </div>
       )}
 
-      {selectedMatch && <MatchPersonnelModal match={selectedMatch} onClose={()=>setSelectedMatch(null)} />}
+      {selectedMatch && <MatchPersonnelModal match={selectedMatch} onClose={()=>setSelectedMatch(null)} personnelId={personnelId} isAdmin={isAdmin} />}
     </div>
   )
 }
@@ -778,7 +783,7 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmi
       {/* Content */}
       <div className="guard-content">
         <NextMatch personnelId={personnelId} />
-        <AssignedMatches assignments={assignments} onEditTimes={setEditingAssignment} />
+        <AssignedMatches assignments={assignments} onEditTimes={setEditingAssignment} personnelId={personnelId} isAdmin={isAdmin} />
         <MyHours personnelId={personnelId} />
       </div>
 

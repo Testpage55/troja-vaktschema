@@ -32,6 +32,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
   const [customSeason, setCustomSeason] = useState('')
   const [attendance, setAttendance] = useState('')
   const [policeContact, setPoliceContact] = useState('')
+  const [noMealDeduction, setNoMealDeduction] = useState(false)
   const [saving, setSaving] = useState(false)
 
   // time = matchstart i databasen
@@ -52,6 +53,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       setCustomSeason('')
       setAttendance(match.attendance ? String(match.attendance) : '')
       setPoliceContact(match.police_contact || '')
+      setNoMealDeduction(!!match.no_meal_deduction)
     }
   }, [match])
 
@@ -80,6 +82,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       season: finalSeason || null,
       attendance: attendance ? parseInt(attendance) : null,
       police_contact: policeContact.trim() || null,
+      no_meal_deduction: noMealDeduction,
     })
     setSaving(false)
     onClose()
@@ -223,6 +226,17 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
               className="form-input"
               placeholder="t.ex. Anna Svensson, Polisen Kronoberg"
             />
+          </div>
+
+          {/* Matavdrag */}
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={noMealDeduction} onChange={e => setNoMealDeduction(e.target.checked)} />
+              Inget matavdrag på den här matchen
+            </label>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>
+              Gäller alla vakter på matchen i löneunderlaget.
+            </div>
           </div>
 
           {/* Säsong */}
