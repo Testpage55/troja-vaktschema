@@ -412,6 +412,56 @@ export function useAppData() {
     } finally { setSaving(false) }
   }
 
+  // Sparar start/sluttid direkt (inline på kort/panel), utan modal och utan helskärms-laddning
+  const saveWorkTimeDirect = async (matchId, personnelId, { startTime, endTime }) => {
+    const match = matches.find(m => m.id === matchId)
+    const person = personnel.find(p => p.id === personnelId)
+    if (!match || !person) return false
+    const { data: existingList, error: selErr } = await supabase.from('work_hours').select('id')
+      .eq('match_id', matchId).eq('personnel_id', personnelId).limit(1)
+    if (selErr) { showToast('Fel vid sparande av arbetstid', 'error'); return false }
+    const existing = existingList?.[0]
+    const { error } = existing
+      ? await supabase.from('work_hours').update({ start_time: startTime, end_time: endTime }).eq('id', existing.id)
+      : await supabase.from('work_hours').insert([{
+          match_id: matchId, personnel_id: personnelId,
+          start_time: startTime, end_time: endTime, work_date: match.date, notes: null
+        }])
+    if (error) { showToast('Fel vid sparande av arbetstid', 'error'); return false }
+    await fetchData()
+    showToast(`Tid sparad för ${person.name}`, 'success')
+    return true
+  }
+
+  // Sätter samma start/sluttid för alla som jobbar på matchen (enskilda tider kan justeras efteråt)
+  const saveWorkTimeBulk = async (matchId, { startTime, endTime }) => {
+    const match = matches.find(m => m.id === matchId)
+    if (!match) return false
+    const workingIds = (match.assignments || []).filter(a => a.is_working).map(a => a.personnel_id)
+    if (workingIds.length === 0) return false
+
+    const { data: rows, error: selErr } = await supabase.from('work_hours').select('id, personnel_id').eq('match_id', matchId)
+    if (selErr) { showToast('Fel vid sparande av arbetstider', 'error'); return false }
+
+    const existingByPerson = new Map((rows || []).map(r => [String(r.personnel_id), r.id]))
+    const updateIds = workingIds.filter(id => existingByPerson.has(String(id))).map(id => existingByPerson.get(String(id)))
+    const insertRows = workingIds.filter(id => !existingByPerson.has(String(id))).map(id => ({
+      match_id: matchId, personnel_id: id, start_time: startTime, end_time: endTime, work_date: match.date, notes: null
+    }))
+
+    if (updateIds.length > 0) {
+      const { error } = await supabase.from('work_hours').update({ start_time: startTime, end_time: endTime }).in('id', updateIds)
+      if (error) { showToast('Fel vid sparande av arbetstider', 'error'); return false }
+    }
+    if (insertRows.length > 0) {
+      const { error } = await supabase.from('work_hours').insert(insertRows)
+      if (error) { showToast('Fel vid sparande av arbetstider', 'error'); return false }
+    }
+    await fetchData()
+    showToast(`Tider sparade för ${workingIds.length} vakter`, 'success')
+    return true
+  }
+
   // ─── Personnel CRUD ───────────────────────────────────────────────────────
 
   const addPersonnel = async () => {
@@ -668,14 +718,14 @@ export function useAppData() {
     confirmModalData,
     selectedMatch, selectedPerson, selectedSecurityDuty,
     showToast, removeToast,
-    closeConfirmModal, handleConfirmAction,
+    showConfirmModal, closeConfirmModal, handleConfirmAction,
     isWorking, getWorkingCount, hasWorkHours, getWorkHoursForMatch,
     hasDeviatingHours, getDetailedTooltip, calculateMileageForMatch,
     groupMatchesByMonth, toggleMonth,
     addMatch, updateMatch, deleteMatch,
     getTotalHoursForPerson, getSecurityHoursForPerson, getTotalAllHoursForPerson,
     addPersonnel, deletePersonnel,
-    openTimeModal, saveWorkTime,
+    openTimeModal, saveWorkTime, saveWorkTimeDirect, saveWorkTimeBulk,
     toggleWorking,
     saveSecurityDuty, deleteSecurityDuty,
     openAddSecurityDutyModal, openEditSecurityDutyModal,

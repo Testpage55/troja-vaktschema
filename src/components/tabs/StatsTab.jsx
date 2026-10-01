@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from 'recharts'
 import { HOURLY_RATE, MILEAGE_RATE } from '../../constants'
 import { supabase } from '../../lib/supabase'
 
@@ -60,7 +60,7 @@ function DelegateReportCell({ delegate, onChanged }) {
     onChanged && onChanged()
   }
 
-  const btn = { fontSize: '12px', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', background: 'white' }
+  const btn = { fontSize: '12px', padding: '3px 9px', borderRadius: '6px', cursor: 'pointer', background: 'white' }
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -163,11 +163,38 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
 
   const hasFilter = seasonFilter !== 'all' || categoryFilter !== 'all' || fromDate || toDate
 
+  const kr = (n) => `${Math.round(n).toLocaleString('sv-SE')} kr`
+  const sum = (key) => personnelStatsData.reduce((t, p) => t + p[key], 0)
+
+  const chartData = [...personnelStatsData]
+    .sort((a, b) => b.hours - a.hours)
+    .map(p => ({ name: p.name, hours: Math.round(p.hours * 10) / 10, label: `${p.hours.toFixed(1)}h · ${p.shifts} pass` }))
+
+  const input = { padding: '6px 8px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '13px', background: 'white' }
+
+  const kpis = [
+    { label: 'Evenemang', value: totalEvents },
+    { label: 'Arbetstillfällen', value: totalShifts, sub: `${filteredWorkHours.length} vakt + ${separateSecurity} säkerhet` },
+    { label: 'Timmar', value: `${totalAllHours.toFixed(1)}h`, sub: totalShifts > 0 ? `snitt ${(totalAllHours / totalShifts).toFixed(1)}h per tillfälle` : null },
+    { label: 'Total kostnad', value: kr(totalCompensation), sub: `lön ${kr(totalSalary)}${totalMileage > 0 ? ` + mil ${kr(totalMileage)}` : ''}`, strong: true },
+    { label: 'Delegatbesök', value: filteredDelegates.length, sub: uniqueDelegateNames.length > 0 ? `${uniqueDelegateNames.length} unika` : null },
+  ]
+
   return (
     <div className="tab-content">
+      <style>{`
+        .st-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+        .st-table th{padding:8px 12px !important;font-size:11px !important;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-500) !important;background:transparent !important;border-bottom:1px solid var(--gray-200) !important;text-align:right;font-weight:600 !important;white-space:nowrap}
+        .st-table td{padding:8px 12px !important;border-bottom:1px solid var(--gray-100) !important;text-align:right;color:var(--gray-800)}
+        .st-table th:first-child,.st-table td:first-child{text-align:left}
+        .st-table tbody tr:hover td{background:var(--gray-50)}
+        .st-table tfoot td{font-weight:700;border-top:2px solid var(--gray-200) !important;border-bottom:none !important;color:var(--gray-900)}
+        .st-card{background:white;border:1px solid var(--gray-200);border-radius:12px}
+        .st-h{margin:0 0 10px;font-size:14px;font-weight:700;color:var(--gray-900)}
+      `}</style>
 
       {/* Filterrad */}
-      <div style={{ background: 'white', borderRadius: '10px', padding: '14px 20px', marginBottom: '24px', boxShadow: 'var(--shadow-sm)', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
         {availableSeasons.length > 0 && (
           <select value={seasonFilter} onChange={e => setSeasonFilter(e.target.value)} className="filter-select">
             <option value="all">Alla säsonger</option>
@@ -180,17 +207,9 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
             {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
-        <input
-          type="date" value={fromDate}
-          onChange={e => setFromDate(e.target.value)}
-          style={{ padding: '8px 10px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '14px' }}
-        />
+        <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} title="Från datum" style={input} />
         <span style={{ color: 'var(--gray-400)' }}>–</span>
-        <input
-          type="date" value={toDate}
-          onChange={e => setToDate(e.target.value)}
-          style={{ padding: '8px 10px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '14px' }}
-        />
+        <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} title="Till datum" style={input} />
         {hasFilter && (
           <button
             onClick={() => { setSeasonFilter('all'); setCategoryFilter('all'); setFromDate(''); setToDate('') }}
@@ -201,81 +220,82 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
         )}
       </div>
 
-      {/* Huvud-KPIer */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        {[
-          { label: 'Evenemang', value: totalEvents, sub: null, bg: '#4f46e5' },
-          { label: 'Arbetstillfällen', value: totalShifts, sub: `${filteredWorkHours.length} vakt + ${separateSecurity} separat säkerhet`, bg: '#db2777' },
-          { label: 'Totala timmar', value: `${totalAllHours.toFixed(1)}h`, sub: totalShifts > 0 ? `Snitt ${(totalAllHours / totalShifts).toFixed(1)}h/tillfälle` : null, bg: '#0891b2' },
-          { label: 'Total kostnad', value: `${totalCompensation.toLocaleString('sv-SE')} kr`, sub: `Lön ${totalSalary.toLocaleString('sv-SE')} kr`, bg: '#dc2626' },
-          { label: 'Delegatbesök', value: filteredDelegates.length, sub: uniqueDelegateNames.length > 0 ? `${uniqueDelegateNames.length} unika` : null, bg: '#2563eb' },
-        ].map(kpi => (
-          <div key={kpi.label} style={{ background: kpi.bg, color: 'white', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>
-            <div style={{ fontSize: '12px', opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{kpi.label}</div>
-            <div style={{ fontSize: '28px', fontWeight: '700' }}>{kpi.value}</div>
-            {kpi.sub && <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '4px' }}>{kpi.sub}</div>}
+      {/* Nyckeltal */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+        {kpis.map(k => (
+          <div key={k.label} className="st-card" style={{ padding: '12px 14px', ...(k.strong ? { borderColor: 'var(--gray-300)', boxShadow: 'var(--shadow-sm)' } : {}) }}>
+            <div style={{ fontSize: '11px', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{k.label}</div>
+            <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--gray-900)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.25 }}>{k.value}</div>
+            {k.sub && <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{k.sub}</div>}
           </div>
         ))}
       </div>
 
-      {/* Graf */}
-      {personnelStatsData.length > 0 && (
-        <div className="chart-container" style={{ marginBottom: '24px' }}>
-          <h3>Tillfällen och timmar per vakt</h3>
-          <ResponsiveContainer width="100%" height={360}>
-            <BarChart data={personnelStatsData} margin={{ top: 10, right: 20, left: 0, bottom: 70 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" angle={-40} textAnchor="end" interval={0} />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="matches" name="Tillfällen" fill="#16a34a" />
-              <Bar dataKey="hours" name="Timmar" fill="#dc2626" />
+      {/* Graf: timmar per vakt */}
+      {chartData.length > 0 && (
+        <div className="st-card" style={{ padding: '14px 16px', marginBottom: '14px' }}>
+          <h3 className="st-h">Timmar per vakt</h3>
+          <ResponsiveContainer width="100%" height={chartData.length * 32 + 24}>
+            <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 110, left: 0, bottom: 0 }} barCategoryGap={6}>
+              <CartesianGrid horizontal={false} stroke="#e5e7eb" />
+              <XAxis type="number" hide />
+              <YAxis type="category" dataKey="name" width={96} tickLine={false} axisLine={false} tick={{ fontSize: 13, fill: '#374151' }} />
+              <Tooltip cursor={{ fill: '#f3f4f6' }} formatter={(v) => [`${v}h`, 'Timmar']} />
+              <Bar dataKey="hours" name="Timmar" fill="#dc2626" radius={[0, 4, 4, 0]} maxBarSize={18}>
+                <LabelList dataKey="label" position="right" style={{ fontSize: 12, fill: '#6b7280' }} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
 
-      {/* Detaljerad tabell */}
+      {/* Per vakt */}
       {personnelStatsData.length > 0 ? (
-        <div className="personnel-stats-table">
-          <h3>Per vakt</h3>
-          <div className="table-container">
-            <table>
+        <div className="st-card" style={{ padding: '14px 16px', marginBottom: '14px' }}>
+          <h3 className="st-h">Per vakt</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="st-table">
               <thead>
                 <tr>
                   <th>Namn</th>
                   <th>Vaktpass</th>
                   <th title="Antal gånger som säkerhetsansvarig (ingår i vaktpasset när vakten även jobbat)">Säkerhetsansv.</th>
-                  <th>Totala timmar</th>
+                  <th>Timmar</th>
                   <th>Lön</th>
-                  <th>Milersättning</th>
-                  <th>Total ersättning</th>
-                  <th>Snitt h/tillfälle</th>
+                  <th>Mil</th>
+                  <th>Totalt</th>
+                  <th>Snitt h</th>
                 </tr>
               </thead>
               <tbody>
                 {personnelStatsData.map(person => (
                   <tr key={person.name}>
                     <td><strong>{person.name}</strong></td>
-                    <td className="text-center"><span className="stat-badge">{person.matches}</span></td>
-                    <td className="text-center"><span className="stat-badge">{person.securityDuties}</span></td>
-                    <td className="text-center">
-                      <strong>{person.hours.toFixed(1)}h</strong>
-                      {person.securityHours > 0 && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>({person.securityHours.toFixed(1)}h säkerhet)</div>
-                      )}
+                    <td>{person.matches}</td>
+                    <td>{person.securityDuties || <span style={{ color: 'var(--gray-300)' }}>–</span>}</td>
+                    <td>
+                      {person.hours.toFixed(1)}h
+                      {person.securityHours > 0 && <span style={{ color: 'var(--gray-400)', fontSize: '11px' }}> ({person.securityHours.toFixed(1)}h säk.)</span>}
                     </td>
-                    <td className="text-center"><strong>{person.salary.toLocaleString('sv-SE')} kr</strong></td>
-                    <td className="text-center"><strong>{person.mileage.toLocaleString('sv-SE')} kr</strong></td>
-                    <td className="text-center"><strong className="total-compensation">{person.totalCompensation.toLocaleString('sv-SE')} kr</strong></td>
-                    <td className="text-center">
-                      {person.shifts > 0
-                        ? (person.hours / person.shifts).toFixed(1)
-                        : 0}h
-                    </td>
+                    <td>{kr(person.salary)}</td>
+                    <td>{person.mileage > 0 ? kr(person.mileage) : <span style={{ color: 'var(--gray-300)' }}>–</span>}</td>
+                    <td><strong>{kr(person.totalCompensation)}</strong></td>
+                    <td>{person.shifts > 0 ? (person.hours / person.shifts).toFixed(1) : '0.0'}h</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr>
+                  <td>Summa</td>
+                  <td>{sum('matches')}</td>
+                  <td>{sum('securityDuties')}</td>
+                  <td>{sum('hours').toFixed(1)}h</td>
+                  <td>{kr(sum('salary'))}</td>
+                  <td>{kr(sum('mileage'))}</td>
+                  <td>{kr(sum('totalCompensation'))}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -287,17 +307,17 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
 
       {/* Delegater */}
       {filteredDelegates.length > 0 && (
-        <div style={{ marginTop: '24px' }}>
-          <h3>Delegatbesök</h3>
-          <div className="table-container">
-            <table>
+        <div className="st-card" style={{ padding: '14px 16px' }}>
+          <h3 className="st-h">Delegatbesök</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="st-table">
               <thead>
                 <tr>
                   <th>Datum</th>
-                  <th>Evenemang</th>
-                  <th>Delegat</th>
-                  <th>Anteckning</th>
-                  <th>Delegatrapport</th>
+                  <th style={{ textAlign: 'left' }}>Evenemang</th>
+                  <th style={{ textAlign: 'left' }}>Delegat</th>
+                  <th style={{ textAlign: 'left' }}>Anteckning</th>
+                  <th style={{ textAlign: 'left' }}>Delegatrapport</th>
                 </tr>
               </thead>
               <tbody>
@@ -305,15 +325,15 @@ export default function StatsTab({ matches, workHours, securityDuties, personnel
                   const match = matches.find(m => m.id === d.match_id)
                   return (
                     <tr key={d.id}>
-                      <td>{d.date ? new Date(d.date).toLocaleDateString('sv-SE') : '-'}</td>
-                      <td>{match?.opponent || '-'}</td>
-                      <td>
-                        <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '99px', background: '#dbeafe', color: '#1e40af', fontWeight: '600' }}>
+                      <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{d.date ? new Date(d.date).toLocaleDateString('sv-SE') : '-'}</td>
+                      <td style={{ textAlign: 'left' }}>{match?.opponent || '-'}</td>
+                      <td style={{ textAlign: 'left' }}>
+                        <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '99px', background: '#dbeafe', color: '#1e40af', fontWeight: '600', whiteSpace: 'nowrap' }}>
                           {d.name}
                         </span>
                       </td>
-                      <td style={{ fontSize: '13px', color: 'var(--gray-500)' }}>{d.notes || '-'}</td>
-                      <td><DelegateReportCell delegate={d} onChanged={onDelegateReportChanged} /></td>
+                      <td style={{ textAlign: 'left', color: 'var(--gray-500)' }}>{d.notes || '-'}</td>
+                      <td style={{ textAlign: 'left' }}><DelegateReportCell delegate={d} onChanged={onDelegateReportChanged} /></td>
                     </tr>
                   )
                 })}

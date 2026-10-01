@@ -101,33 +101,33 @@ function PersonDetailModal({ person, workHours, securityDuties, onClose, onExpor
       >
         {/* Header */}
         <div style={{
-          padding: '20px 24px', borderBottom: '1px solid var(--gray-100)',
-          display: 'flex', alignItems: 'center', gap: '16px'
+          padding: '12px 18px', borderBottom: '1px solid var(--gray-100)',
+          display: 'flex', alignItems: 'center', gap: '12px'
         }}>
           <div style={{
-            width: '48px', height: '48px', borderRadius: '50%',
+            width: '38px', height: '38px', borderRadius: '50%',
             background: '#16a34a', color: 'white',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '16px', fontWeight: '700', flexShrink: 0
+            fontSize: '14px', fontWeight: '700', flexShrink: 0
           }}>
             {getInitials(person.name)}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--gray-900)' }}>{person.name}</div>
-            <div style={{ fontSize: '13px', color: 'var(--gray-500)' }}>{isRegular ? 'Ordinarie vakt' : 'Extra vakt'}</div>
+            <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--gray-900)', lineHeight: 1.2 }}>{person.name}</div>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{isRegular ? 'Ordinarie vakt' : 'Extra vakt'}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: 'var(--gray-500)' }}>×</button>
         </div>
 
         {/* Mil till jobbet */}
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--gray-100)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ padding: '8px 18px', borderBottom: '1px solid var(--gray-100)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <label style={{ fontSize: '13px', color: 'var(--gray-600)', fontWeight: '600' }}>🚗 Mil till jobbet (enkel resa)</label>
           <input
             type="text" inputMode="decimal" value={commuteInput}
             onChange={e => setCommuteInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && commuteDirty && saveCommute()}
             placeholder="t.ex. 3,5"
-            style={{ width: '90px', padding: '6px 10px', border: `1px solid ${commuteValid ? 'var(--gray-200)' : '#fca5a5'}`, borderRadius: '6px', fontSize: '14px' }}
+            style={{ width: '70px', padding: '4px 8px', border: `1px solid ${commuteValid ? 'var(--gray-200)' : '#fca5a5'}`, borderRadius: '6px', fontSize: '14px' }}
           />
           <span style={{ fontSize: '13px', color: 'var(--gray-500)' }}>mil</span>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--gray-600)', cursor: 'pointer' }}>
@@ -137,28 +137,28 @@ function PersonDetailModal({ person, workHours, securityDuties, onClose, onExpor
           <button
             onClick={saveCommute}
             disabled={!commuteDirty || savingCommute}
-            style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: '#16a34a', color: 'white', fontWeight: '600', fontSize: '13px', cursor: 'pointer', opacity: !commuteDirty ? 0.4 : 1 }}
+            style={{ padding: '4px 12px', borderRadius: '6px', border: 'none', background: '#16a34a', color: 'white', fontWeight: '600', fontSize: '13px', cursor: 'pointer', opacity: !commuteDirty ? 0.4 : 1 }}
           >
             {savingCommute ? 'Sparar…' : 'Spara'}
           </button>
         </div>
 
         {/* Statistik-chips */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', padding: '16px 24px', borderBottom: '1px solid var(--gray-100)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', padding: '10px 18px', borderBottom: '1px solid var(--gray-100)' }}>
           {[
             { label: 'Tillfällen', value: filtered.length },
             { label: 'Totala timmar', value: `${totalHours.toFixed(1)}h` },
             { label: 'Total lön', value: `${totalSalary.toLocaleString('sv-SE')} kr` },
           ].map(stat => (
-            <div key={stat.label} style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
-              <div style={{ fontSize: '11px', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{stat.label}</div>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--gray-900)' }}>{stat.value}</div>
+            <div key={stat.label} style={{ background: 'var(--gray-50)', borderRadius: '8px', padding: '6px 8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '10px', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</div>
+              <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--gray-900)' }}>{stat.value}</div>
             </div>
           ))}
         </div>
 
         {/* Filter */}
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--gray-100)', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ padding: '8px 18px', borderBottom: '1px solid var(--gray-100)', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="filter-select" style={{ fontSize: '13px' }}>
             <option value="all">Alla pass</option>
             <option value="work">Vaktpass</option>
@@ -182,7 +182,7 @@ function PersonDetailModal({ person, workHours, securityDuties, onClose, onExpor
 
         {/* Summering av filtrerat */}
         {(fromDate || toDate || typeFilter !== 'all') && filtered.length > 0 && (
-          <div style={{ padding: '8px 24px', background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', fontSize: '13px', color: '#15803d' }}>
+          <div style={{ padding: '5px 18px', background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', fontSize: '13px', color: '#15803d' }}>
             {filtered.length} pass • {totalHours.toFixed(1)}h • {totalSalary.toLocaleString('sv-SE')} kr lön
             {totalMileage > 0 && ` • ${totalMileage.toLocaleString('sv-SE')} kr mil`}
           </div>
@@ -199,12 +199,12 @@ function PersonDetailModal({ person, workHours, securityDuties, onClose, onExpor
               <div
                 key={entry.id}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '14px',
-                  padding: '12px 24px',
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '7px 18px',
                   borderBottom: '1px solid var(--gray-100)'
                 }}
               >
-                <div style={{ minWidth: '80px' }}>
+                <div style={{ minWidth: '62px' }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--gray-900)' }}>
                     {new Date(entry.date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
                   </div>
@@ -243,7 +243,7 @@ function PersonDetailModal({ person, workHours, securityDuties, onClose, onExpor
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--gray-100)', display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
+        <div style={{ padding: '10px 18px', borderTop: '1px solid var(--gray-100)', display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
               className="btn btn-sm btn-success"
@@ -277,9 +277,9 @@ function PersonCard({ person, totalHours, securityHours, isRegular, lastShift, s
       style={{
         background: 'white', borderRadius: '12px',
         border: `1px solid ${person.is_security_responsible ? '#bfdbfe' : 'var(--gray-200)'}`,
-        padding: '16px', cursor: 'pointer',
+        padding: '8px 14px', cursor: 'pointer',
         transition: 'box-shadow 0.15s, border-color 0.15s',
-        display: 'flex', alignItems: 'center', gap: '14px'
+        display: 'flex', alignItems: 'center', gap: '12px'
       }}
       onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}
@@ -287,11 +287,11 @@ function PersonCard({ person, totalHours, securityHours, isRegular, lastShift, s
       <div
         onClick={onClick}
         style={{
-          width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0,
+          width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
           background: person.is_security_responsible ? '#2563eb' : (isRegular ? '#16a34a' : 'var(--gray-300)'),
           color: 'white',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+          fontSize: '12px', fontWeight: '700', cursor: 'pointer'
         }}
       >
         {getInitials(person.name)}
@@ -305,7 +305,7 @@ function PersonCard({ person, totalHours, securityHours, isRegular, lastShift, s
             </span>
           )}
         </div>
-        <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: 1.3 }}>
           {lastShift
             ? `Senaste pass: ${new Date(lastShift).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}`
             : shiftCount !== null
@@ -315,15 +315,15 @@ function PersonCard({ person, totalHours, securityHours, isRegular, lastShift, s
         </div>
       </div>
       <div style={{ textAlign: 'right' }} onClick={onClick}>
-        <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--gray-900)' }}>{(isNaN(total) ? 0 : total).toFixed(1)}h</div>
+        <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--gray-900)', lineHeight: 1.2 }}>{(isNaN(total) ? 0 : total).toFixed(1)}h</div>
         <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>{((isNaN(total) ? 0 : total) * HOURLY_RATE).toLocaleString('sv-SE')} kr</div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
           onClick={e => { e.stopPropagation(); onToggleSecurityRole(person.id, !person.is_security_responsible) }}
           title={person.is_security_responsible ? 'Ta bort säkerhetsansvarig-roll' : 'Markera som säkerhetsansvarig'}
           style={{
-            width: '28px', height: '28px', borderRadius: '50%', border: 'none',
+            width: '26px', height: '26px', borderRadius: '50%', border: 'none',
             background: person.is_security_responsible ? '#2563eb' : 'var(--gray-100)',
             color: person.is_security_responsible ? 'white' : 'var(--gray-400)',
             cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -410,13 +410,10 @@ export default function PersonnelTab({
 
   return (
     <div className="tab-content">
-      <div className="actions">
-        <button className="btn btn-success" onClick={addPersonnel} disabled={saving}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', alignItems: 'center' }}>
+        <button className="btn btn-success" onClick={addPersonnel} disabled={saving} style={{ padding: '8px 14px', fontSize: '14px' }}>
           + Lägg till vakt
         </button>
-      </div>
-
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: '1 1 200px' }}>
           <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', fontSize: '16px', pointerEvents: 'none' }}>🔍</span>
           <input
@@ -425,7 +422,7 @@ export default function PersonnelTab({
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{
-              width: '100%', padding: '10px 12px 10px 36px', boxSizing: 'border-box',
+              width: '100%', padding: '8px 12px 8px 36px', boxSizing: 'border-box',
               border: '1px solid var(--gray-200)', borderRadius: '8px',
               fontSize: '14px', outline: 'none', background: 'white'
             }}
@@ -442,7 +439,7 @@ export default function PersonnelTab({
           value={fromDate}
           onChange={e => setFromDate(e.target.value)}
           title="Från datum"
-          style={{ padding: '8px 10px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '13px' }}
+          style={{ padding: '6px 8px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '13px' }}
         />
         <span style={{ color: 'var(--gray-400)', fontSize: '13px' }}>–</span>
         <input
@@ -450,7 +447,7 @@ export default function PersonnelTab({
           value={toDate}
           onChange={e => setToDate(e.target.value)}
           title="Till datum"
-          style={{ padding: '8px 10px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '13px' }}
+          style={{ padding: '6px 8px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '13px' }}
         />
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="filter-select">
           <option value="name">Sortera: Namn</option>
@@ -467,12 +464,12 @@ export default function PersonnelTab({
         )}
       </div>
       {hasFilter && (
-        <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '12px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '8px' }}>
           Filtrerat — timmar och passantal gäller valt urval
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {allPersonnel.map(person => (
           <PersonCard
             key={person.id}

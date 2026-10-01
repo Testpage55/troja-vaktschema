@@ -90,187 +90,106 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
 
   if (!isOpen) return null
 
+  const field = { display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }
+  const lbl = { fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)' }
+  const ctl = { padding: '8px 10px', fontSize: '14px', width: '100%', boxSizing: 'border-box' }
+  const row = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content add-match-modal"
         onClick={e => e.stopPropagation()}
-        style={{ maxWidth: '500px', width: '100%' }}
+        style={{ maxWidth: '460px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
       >
-        <div className="modal-header">
-          <h2>Redigera evenemang</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--gray-200)', flexShrink: 0 }}>
+          <h2 style={{ margin: 0, fontSize: '17px' }}>Redigera evenemang</h2>
+          <button onClick={onClose} aria-label="Stäng" style={{ background: 'none', border: 'none', fontSize: '24px', lineHeight: 1, cursor: 'pointer', color: 'var(--gray-500)' }}>×</button>
         </div>
 
-        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
 
-          {/* Datum */}
-          <div className="form-group">
-            <label>Datum *</label>
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              className="form-input"
-            />
+          <div style={field}>
+            <label style={lbl}>Motstånd / namn *</label>
+            <input type="text" value={opponent} onChange={e => setOpponent(e.target.value)} className="form-input" style={ctl} placeholder="t.ex. Frölunda HC eller Konsert XYZ" />
           </div>
 
-          {/* Matchens starttid */}
-          <div className="form-group">
-            <label>Matchens starttid</label>
-            <input
-              type="time"
-              value={matchTime}
-              onChange={e => setMatchTime(e.target.value)}
-              className="form-input"
-            />
-            {matchTime && (
-              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '6px' }}>
-                Vakterna börjar {minutesToTime(timeToMinutes(matchTime) - 120)} (2h före match)
+          <div style={row}>
+            <div style={field}>
+              <label style={lbl}>Datum *</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="form-input" style={ctl} />
+            </div>
+            <div style={field}>
+              <label style={lbl}>Matchstart{matchTime ? ` (vakt ${minutesToTime(timeToMinutes(matchTime) - 120)})` : ''}</label>
+              <input type="time" value={matchTime} onChange={e => setMatchTime(e.target.value)} className="form-input" style={ctl} />
+            </div>
+          </div>
+
+          <div style={row}>
+            <div style={field}>
+              <label style={lbl}>Typ</label>
+              <select value={matchType} onChange={e => setMatchType(e.target.value)} className="form-select" style={ctl}>
+                <option value="home">Hemma</option>
+                <option value="away">Borta</option>
+              </select>
+            </div>
+            <div style={field}>
+              <label style={lbl}>Antal vakter</label>
+              <input type="number" min="1" max="20" value={requiredGuards} onChange={e => setRequiredGuards(e.target.value)} className="form-input" style={ctl} />
+            </div>
+            {matchType === 'away' && (
+              <div style={field}>
+                <label style={lbl}>Avstånd (mil)</label>
+                <input type="number" step="0.1" min="0" value={distanceMiles} onChange={e => setDistanceMiles(e.target.value)} className="form-input" style={ctl} placeholder="5.5" />
               </div>
             )}
           </div>
 
-          {/* Motstånd */}
-          <div className="form-group">
-            <label>Motstånd / namn *</label>
-            <input
-              type="text"
-              value={opponent}
-              onChange={e => setOpponent(e.target.value)}
-              className="form-input"
-              placeholder="t.ex. Frölunda HC eller Konsert XYZ"
-            />
-          </div>
-
-          {/* Hemma/Borta */}
-          <div className="form-group">
-            <label>Typ</label>
-            <select value={matchType} onChange={e => setMatchType(e.target.value)} className="form-select">
-              <option value="home">Hemma</option>
-              <option value="away">Borta</option>
-            </select>
-          </div>
-
-          {matchType === 'away' && (
-            <div className="form-group">
-              <label>Avstånd (mil)</label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                value={distanceMiles}
-                onChange={e => setDistanceMiles(e.target.value)}
-                className="form-input"
-                placeholder="t.ex. 5.5"
-              />
+          <div style={row}>
+            <div style={field}>
+              <label style={lbl}>Kategori</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="form-select" style={ctl}>
+                <option value="">Ingen kategori</option>
+                {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="__new__">+ Ny kategori...</option>
+              </select>
+              {category === '__new__' && (
+                <input type="text" value={customCategory} onChange={e => setCustomCategory(e.target.value)} className="form-input" style={ctl} placeholder="Ny kategori" autoFocus />
+              )}
             </div>
-          )}
-
-          {/* Antal vakter */}
-          <div className="form-group">
-            <label>Antal vakter som behövs</label>
-            <input
-              type="number"
-              min="1"
-              max="20"
-              value={requiredGuards}
-              onChange={e => setRequiredGuards(e.target.value)}
-              className="form-input"
-            />
-          </div>
-
-          {/* Kategori */}
-          <div className="form-group">
-            <label>Kategori</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} className="form-select">
-              <option value="">Ingen kategori</option>
-              {allCategories.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-              <option value="__new__">+ Ny kategori...</option>
-            </select>
-            {category === '__new__' && (
-              <input
-                type="text"
-                value={customCategory}
-                onChange={e => setCustomCategory(e.target.value)}
-                className="form-input"
-                placeholder="Ange ny kategori"
-                style={{ marginTop: '8px' }}
-                autoFocus
-              />
-            )}
-          </div>
-
-          {/* Publikantal */}
-          <div className="form-group">
-            <label>Publikantal</label>
-            <input
-              type="number"
-              min="0"
-              value={attendance}
-              onChange={e => setAttendance(e.target.value)}
-              className="form-input"
-              placeholder="Antal åskådare (valfritt)"
-            />
-          </div>
-
-          {/* Poliskontakt */}
-          <div className="form-group">
-            <label>Poliskontakt (valfritt)</label>
-            <input
-              type="text"
-              value={policeContact}
-              onChange={e => setPoliceContact(e.target.value)}
-              className="form-input"
-              placeholder="t.ex. Anna Svensson, Polisen Kronoberg"
-            />
-          </div>
-
-          {/* Matavdrag */}
-          <div className="form-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={noMealDeduction} onChange={e => setNoMealDeduction(e.target.checked)} />
-              Inget matavdrag på den här matchen
-            </label>
-            <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '4px' }}>
-              Gäller alla vakter på matchen i löneunderlaget.
+            <div style={field}>
+              <label style={lbl}>Säsong</label>
+              <select value={season} onChange={e => setSeason(e.target.value)} className="form-select" style={ctl}>
+                {allSeasons.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value="__new__">+ Ny säsong...</option>
+              </select>
+              {season === '__new__' && (
+                <input type="text" value={customSeason} onChange={e => setCustomSeason(e.target.value)} className="form-input" style={ctl} placeholder="t.ex. 2026/2027" autoFocus />
+              )}
             </div>
           </div>
 
-          {/* Säsong */}
-          <div className="form-group">
-            <label>Säsong</label>
-            <select value={season} onChange={e => setSeason(e.target.value)} className="form-select">
-              {allSeasons.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-              <option value="__new__">+ Ny säsong...</option>
-            </select>
-            {season === '__new__' && (
-              <input
-                type="text"
-                value={customSeason}
-                onChange={e => setCustomSeason(e.target.value)}
-                className="form-input"
-                placeholder="t.ex. 2026/2027"
-                style={{ marginTop: '8px' }}
-                autoFocus
-              />
-            )}
+          <div style={row}>
+            <div style={field}>
+              <label style={lbl}>Publikantal</label>
+              <input type="number" min="0" value={attendance} onChange={e => setAttendance(e.target.value)} className="form-input" style={ctl} placeholder="Valfritt" />
+            </div>
+            <div style={field}>
+              <label style={lbl}>Poliskontakt</label>
+              <input type="text" value={policeContact} onChange={e => setPoliceContact(e.target.value)} className="form-input" style={ctl} placeholder="Valfritt" />
+            </div>
           </div>
 
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }} title="Gäller alla vakter på matchen i löneunderlaget">
+            <input type="checkbox" checked={noMealDeduction} onChange={e => setNoMealDeduction(e.target.checked)} />
+            Inget matavdrag på den här matchen
+          </label>
         </div>
 
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Avbryt</button>
-          <button
-            className="btn btn-primary"
-            onClick={handleSave}
-            disabled={saving || !date || !opponent.trim()}
-          >
-            {saving ? 'Sparar...' : 'Spara ändringar'}
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', padding: '12px 18px', borderTop: '1px solid var(--gray-200)', flexShrink: 0 }}>
+          <button className="btn btn-secondary" onClick={onClose} style={{ padding: '8px 16px' }}>Avbryt</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving || !date || !opponent.trim()} style={{ padding: '8px 16px' }}>
+            {saving ? 'Sparar...' : 'Spara'}
           </button>
         </div>
       </div>

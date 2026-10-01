@@ -84,6 +84,33 @@ export default function FairnessTab({ matches, personnel, workHours, securityDut
     return { list: sorted, avg }
   }, [personnel, staffedMatches, filteredMatches, workHours, securityDuties, seasonFilter, periodFilter, totalStaffed, showAllPersonnel, sortKey])
 
+  // Matcher per person där hen är säkerhetsansvarig eller ställföreträdande (följer samma filter)
+  const securityByPerson = useMemo(() => {
+    const today = todayStr()
+    const fmt = (d) => new Date(d).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+    return personnel.map(p => {
+      const items = []
+      filteredMatches.forEach(m => {
+        if (m.security_responsible_id === p.id) items.push({ key: `m${m.id}`, date: m.date, label: m.opponent, type: m.match_type, role: 'lead' })
+        if (m.deputy_security_responsible_id === p.id) items.push({ key: `d${m.id}`, date: m.date, label: m.opponent, type: m.match_type, role: 'deputy' })
+      })
+      securityDuties.forEach(d => {
+        if (d.auto || d.personnel_name !== p.name) return
+        if (seasonFilter !== 'all' && (d.season || '') !== seasonFilter) return
+        if (periodFilter === 'past' && d.date >= today) return
+        if (periodFilter === 'upcoming' && d.date < today) return
+        items.push({ key: `u${d.id}`, date: d.date, label: d.opponent, type: null, role: 'lead', manual: true })
+      })
+      items.sort((a, b) => a.date.localeCompare(b.date))
+      return {
+        id: p.id, name: p.name, isRegular: REGULAR_GUARDS.includes(p.name),
+        lead: items.filter(i => i.role === 'lead').length,
+        deputy: items.filter(i => i.role === 'deputy').length,
+        items: items.map(i => ({ ...i, dateLabel: fmt(i.date), upcoming: i.date >= today })),
+      }
+    }).filter(r => r.items.length > 0).sort((a, b) => (b.lead + b.deputy) - (a.lead + a.deputy) || a.name.localeCompare(b.name, 'sv-SE'))
+  }, [personnel, filteredMatches, securityDuties, seasonFilter, periodFilter])
+
   const maxShifts = Math.max(1, ...rows.list.map(r => r.shifts))
   const hasFilter = seasonFilter !== 'all' || categoryFilter !== 'all' || typeFilter !== 'all' || periodFilter !== 'all'
 
@@ -233,6 +260,46 @@ export default function FairnessTab({ matches, personnel, workHours, securityDut
       ) : (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-400)' }}>
           Inga bemannade matcher matchar filtret
+        </div>
+      )}
+      {/* Säkerhetsansvarig per vakt */}
+      {securityByPerson.length > 0 && (
+        <div style={{ marginTop: '32px' }}>
+          <h3 style={{ margin: '0 0 4px' }}>Säkerhetsansvarig per vakt</h3>
+          <p style={{ fontSize: '12px', color: 'var(--gray-500)', margin: '0 0 14px' }}>
+            Matcher där vakten är säkerhetsansvarig eller ställföreträdande, enligt valda filter.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '12px' }}>
+            {securityByPerson.map(r => (
+              <div key={r.id} style={{ background: 'white', border: '1px solid var(--gray-200)', borderRadius: '12px', padding: '14px', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <strong style={{ fontSize: '15px' }}>
+                    {r.name}
+                    {!r.isRegular && <span style={{ marginLeft: '6px', fontSize: '11px', fontWeight: '400', color: 'var(--gray-400)' }}>extra</span>}
+                  </strong>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {r.lead > 0 && <span title="Säkerhetsansvarig" style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '99px', background: '#2563eb', color: 'white' }}>🛡 {r.lead}</span>}
+                    {r.deputy > 0 && <span title="Ställföreträdande" style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '99px', background: '#bae6fd', color: '#075985' }}>Ställf. {r.deputy}</span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {r.items.map(i => (
+                    <div key={i.key} style={{
+                      display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', padding: '4px 8px', borderRadius: '6px',
+                      background: i.role === 'lead' ? '#eff6ff' : '#f0f9ff',
+                      opacity: i.upcoming ? 1 : 0.7
+                    }}>
+                      <span style={{ width: '48px', flexShrink: 0, color: 'var(--gray-500)', fontVariantNumeric: 'tabular-nums' }}>{i.dateLabel}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '500', color: 'var(--gray-800)' }}>{i.label}</span>
+                      {i.type === 'away' && <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>borta</span>}
+                      {i.role === 'deputy' && <span style={{ fontSize: '10px', fontWeight: '700', color: '#075985' }}>ställf.</span>}
+                      {i.manual && <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>manuell</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

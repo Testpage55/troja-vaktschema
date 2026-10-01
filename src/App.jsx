@@ -16,6 +16,7 @@ import WorkHoursTab from './components/tabs/WorkHoursTab'
 import SecurityTab from './components/tabs/SecurityTab'
 import StatsTab from './components/tabs/StatsTab'
 import FairnessTab from './components/tabs/FairnessTab'
+import UsersTab from './components/tabs/UsersTab'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('schedule')
@@ -121,6 +122,7 @@ export default function App() {
           { key: 'security', label: 'Säkerhetsansvarig' },
           { key: 'stats', label: 'Statistik' },
           { key: 'fairness', label: 'Rättvisa' },
+          { key: 'users', label: 'Användare' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -157,6 +159,8 @@ export default function App() {
           calculateMileageForMatch={data.calculateMileageForMatch}
           toggleWorking={data.toggleWorking}
           openTimeModal={data.openTimeModal}
+          saveWorkTimeDirect={data.saveWorkTimeDirect}
+          saveWorkTimeBulk={data.saveWorkTimeBulk}
           updateMatch={data.updateMatch}
           deleteMatch={data.deleteMatch}
           onAddMatch={() => data.setIsAddMatchModalOpen(true)}
@@ -244,6 +248,16 @@ export default function App() {
           seasonFilter={data.seasonFilter}
           setSeasonFilter={data.setSeasonFilter}
           availableSeasons={data.availableSeasons}
+        />
+      )}
+
+      {activeTab === 'users' && (
+        <UsersTab
+          personnel={data.personnel}
+          currentUserId={auth.user?.id}
+          showToast={data.showToast}
+          showConfirmModal={data.showConfirmModal}
+          onCreated={data.refreshData}
         />
       )}
 

@@ -3,6 +3,7 @@ import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { SECURITY_RESPONSIBLE, REGULAR_GUARDS } from '../../constants'
 import EditMatchModal from '../modals/EditMatchModal'
 import { supabase } from '../../lib/supabase'
+import { calculateWorkTimes } from '../../utils/timeUtils'
 
 function PersonRow({ person, match, toggleWorking, saving }) {
   const isSecResp = match.security_responsible_id == person.id
@@ -100,8 +101,154 @@ function NotWorkingList({ match, notWorkingPersonnel, allPersonnel, isWorking, t
   )
 }
 
+// Klass 3-match = både säkerhetsansvarig och ställföreträdande är valda
+const isClass3 = (m) => !!m.security_responsible_id && !!m.deputy_security_responsible_id
+
+function Class3Badge() {
+  return (
+    <span title="Klass 3: säkerhetsansvarig och ställföreträdande är valda"
+      style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '99px', background: '#7c3aed', color: 'white', whiteSpace: 'nowrap' }}>
+      Klass 3
+    </span>
+  )
+}
+
 function getInitials(name) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
+function toMin(t) { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0) }
+function calcHours(start, end) {
+  if (!start || !end) return 0
+  let diff = toMin(end) - toMin(start)
+  if (diff <= 0) diff += 1440
+  return parseFloat((diff / 60).toFixed(2))
+}
+const hhmm = (t) => (t ? String(t).slice(0, 5) : '')
+
+// Tider som kan ändras direkt på plats: klicka på tiden, ändra, Enter/✓ sparar, Esc/✕ avbryter
+function TimeEditor({ match, person, wh, onSave, outlier = false }) {
+  const [editing, setEditing] = useState(false)
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [busy, setBusy] = useState(false)
+  const stop = (e) => e.stopPropagation()
+
+  const open = (e) => {
+    e.stopPropagation()
+    const def = calculateWorkTimes(match.time)
+    setStart(hhmm(wh?.start_time) || def.startTime)
+    setEnd(hhmm(wh?.end_time) || def.endTime)
+    setEditing(true)
+  }
+
+  const save = async () => {
+    if (!start || !end || start === end) return
+    setBusy(true)
+    const ok = await onSave(match.id, person.id, { startTime: start, endTime: end })
+    setBusy(false)
+    if (ok) setEditing(false)
+  }
+
+  const onKey = (e) => {
+    e.stopPropagation()
+    if (e.key === 'Enter') save()
+    if (e.key === 'Escape') setEditing(false)
+  }
+
+  if (!editing) {
+    const hours = wh ? calcHours(hhmm(wh.start_time), hhmm(wh.end_time)) : null
+    return (
+      <button
+        onClick={open}
+        title={outlier ? 'Avviker från övriga vakters tid. Klicka för att ändra' : 'Klicka för att ändra tid'}
+        className="time-chip"
+        style={{
+          background: 'transparent', border: 'none', padding: '3px 6px', borderRadius: '6px',
+          cursor: 'pointer', fontSize: '13px', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+          color: wh ? 'var(--gray-800)' : 'var(--gray-500)', display: 'inline-flex', alignItems: 'center', gap: '6px'
+        }}
+      >
+        {outlier && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />}
+        {wh ? (
+          <>
+            <span>{hhmm(wh.start_time)}–{hhmm(wh.end_time)}</span>
+            <span style={{ color: 'var(--gray-400)', minWidth: '32px', textAlign: 'right' }}>{String(hours).replace('.', ',')}h</span>
+          </>
+        ) : 'Sätt tid'}
+      </button>
+    )
+  }
+
+  const inp = { width: '84px', padding: '4px 6px', border: '1px solid var(--gray-300)', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }
+  const hrs = calcHours(start, end)
+  return (
+    <div onClick={stop} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+      <input type="time" value={start} onChange={e => setStart(e.target.value)} onKeyDown={onKey} autoFocus style={inp} aria-label="Starttid" />
+      <span style={{ color: 'var(--gray-400)' }}>–</span>
+      <input type="time" value={end} onChange={e => setEnd(e.target.value)} onKeyDown={onKey} style={inp} aria-label="Sluttid" />
+      <span style={{ fontSize: '12px', color: 'var(--gray-500)', minWidth: '34px' }}>{start && end && start !== end ? `${hrs}h` : ''}</span>
+      <button onClick={save} disabled={busy || !start || !end || start === end} aria-label="Spara"
+        style={{ border: 'none', background: '#16a34a', color: 'white', borderRadius: '6px', padding: '4px 9px', cursor: 'pointer', fontSize: '13px' }}>✓</button>
+      <button onClick={(e) => { stop(e); setEditing(false) }} aria-label="Avbryt"
+        style={{ border: '1px solid var(--gray-300)', background: 'white', color: 'var(--gray-600)', borderRadius: '6px', padding: '4px 9px', cursor: 'pointer', fontSize: '13px' }}>✕</button>
+    </div>
+  )
+}
+
+// Ändra alla vakters tider på en match på en gång
+function BulkTimeEditor({ match, workingPersonnel, getWorkHoursForMatch, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [busy, setBusy] = useState(false)
+  const stop = (e) => e.stopPropagation()
+
+  const open = (e) => {
+    e.stopPropagation()
+    const first = workingPersonnel.map(p => getWorkHoursForMatch(match.id, p.id)).find(Boolean)
+    const def = calculateWorkTimes(match.time)
+    setStart(hhmm(first?.start_time) || def.startTime)
+    setEnd(hhmm(first?.end_time) || def.endTime)
+    setEditing(true)
+  }
+
+  const save = async () => {
+    if (!start || !end || start === end) return
+    setBusy(true)
+    const ok = await onSave(match.id, { startTime: start, endTime: end })
+    setBusy(false)
+    if (ok) setEditing(false)
+  }
+
+  const onKey = (e) => {
+    e.stopPropagation()
+    if (e.key === 'Enter') save()
+    if (e.key === 'Escape') setEditing(false)
+  }
+
+  if (!editing) {
+    return (
+      <button onClick={open}
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: 'var(--gray-500)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+        Ändra alla
+      </button>
+    )
+  }
+
+  const inp = { width: '84px', padding: '4px 6px', border: '1px solid var(--gray-300)', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }
+  return (
+    <div onClick={stop} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', padding: '8px', background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: '8px' }}>
+      <span style={{ fontSize: '12px', color: 'var(--gray-600)', width: '100%' }}>Alla {workingPersonnel.length} vakter</span>
+      <input type="time" value={start} onChange={e => setStart(e.target.value)} onKeyDown={onKey} autoFocus style={inp} aria-label="Starttid alla" />
+      <span style={{ color: 'var(--gray-400)' }}>–</span>
+      <input type="time" value={end} onChange={e => setEnd(e.target.value)} onKeyDown={onKey} style={inp} aria-label="Sluttid alla" />
+      <button onClick={save} disabled={busy || !start || !end || start === end}
+        style={{ border: 'none', background: '#16a34a', color: 'white', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '13px' }}>Spara alla</button>
+      <button onClick={(e) => { stop(e); setEditing(false) }}
+        style={{ border: '1px solid var(--gray-300)', background: 'white', color: 'var(--gray-600)', borderRadius: '6px', padding: '4px 9px', cursor: 'pointer', fontSize: '13px' }}>✕</button>
+    </div>
+  )
 }
 
 function AddDelegateForm({ matchId, matchDate, delegates, onAdd, onDelete, saving }) {
@@ -245,13 +392,15 @@ function AttendanceInline({ match }) {
   )
 }
 
-function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, openTimeModal, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, onUpdateDeputySecurityResponsible, currentPersonnelId, onExtrasChanged }) {
+function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, saveWorkTimeDirect, saveWorkTimeBulk, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, onUpdateDeputySecurityResponsible, currentPersonnelId, onExtrasChanged }) {
   const [search, setSearch] = useState('')
   const matchType = match.match_type || 'home'
   const q = search.toLowerCase()
+  const panelRank = (p) => (match.security_responsible_id == p.id ? 0 : match.deputy_security_responsible_id == p.id ? 1 : 2)
   const workingPersonnel = allPersonnel
     .filter(p => isWorking(match, p.id))
     .filter(p => !q || p.name.toLowerCase().includes(q))
+    .sort((a, b) => panelRank(a) - panelRank(b))
   const notWorkingPersonnel = allPersonnel
     .filter(p => !isWorking(match, p.id))
     .filter(p => !q || p.name.toLowerCase().includes(q))
@@ -285,7 +434,10 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
                 {new Date(match.date).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
                 {' • '}{match.end_time || match.time}{match.time && match.end_time ? ` • Vaktstart ${match.time}` : ''}
               </div>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--gray-900)' }}>{match.opponent}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '20px', fontWeight: '700', color: 'var(--gray-900)' }}>{match.opponent}</span>
+                {isClass3(match) && <Class3Badge />}
+              </div>
               {/* Publikantal */}
               <AttendanceInline match={match} />
             </div>
@@ -395,17 +547,22 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
             {workingPersonnel.length === 0 && !q && (
               <div style={{ fontSize: '13px', color: 'var(--gray-500)', fontStyle: 'italic' }}>Ingen tilldelad ännu</div>
             )}
+            {allPersonnel.filter(p => isWorking(match, p.id)).length > 1 && saveWorkTimeBulk && (
+              <div style={{ marginBottom: '10px' }}>
+                <BulkTimeEditor match={match} workingPersonnel={allPersonnel.filter(p => isWorking(match, p.id))} getWorkHoursForMatch={getWorkHoursForMatch} onSave={saveWorkTimeBulk} />
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {workingPersonnel.map(person => {
                 const wh = getWorkHoursForMatch(match.id, person.id)
-                const deviating = hasDeviatingHours(match.id, person.id)
                 const isSecResp = match.security_responsible_id == person.id
                 return (
                   <div key={person.id} style={{
                     display: 'flex', alignItems: 'center', gap: '12px',
                     padding: '10px 14px',
-                    background: isSecResp ? '#eff6ff' : '#f0fdf4',
-                    border: `1px solid ${isSecResp ? '#bfdbfe' : '#bbf7d0'}`,
+                    background: isSecResp ? '#dbeafe' : '#f0fdf4',
+                    border: `1px solid ${isSecResp ? '#93c5fd' : '#bbf7d0'}`,
+                    borderLeft: isSecResp ? '5px solid #2563eb' : undefined,
                     borderRadius: '10px'
                   }}>
                     <div style={{
@@ -419,22 +576,12 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-900)' }}>
                         {person.name}
-                        {isSecResp && <span style={{ fontSize: '10px', marginLeft: '6px', color: '#2563eb', background: '#dbeafe', padding: '1px 6px', borderRadius: '99px' }}>Säkerhetsansvarig</span>}
+                        {isSecResp && <span style={{ fontSize: '10px', fontWeight: '700', marginLeft: '6px', color: 'white', background: '#2563eb', padding: '2px 8px', borderRadius: '99px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>🛡 Säkerhetsansvarig</span>}
                         {match.deputy_security_responsible_id == person.id && <span style={{ fontSize: '10px', marginLeft: '6px', color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '99px' }}>Ställföreträdande</span>}
                       </div>
-                      {wh && (
-                        <div style={{ fontSize: '12px', color: deviating ? '#d97706' : (isSecResp ? '#2563eb' : '#16a34a') }}>
-                          {wh.start_time} – {wh.end_time} • {wh.total_hours}h{deviating && ' ⚠'}
-                        </div>
-                      )}
+                      <TimeEditor match={match} person={person} wh={wh} onSave={saveWorkTimeDirect} />
                     </div>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      {wh && (
-                        <button onClick={() => openTimeModal(match.id, person.id)} disabled={saving}
-                          style={{ fontSize: '12px', padding: '5px 10px', border: '1px solid #16a34a', borderRadius: '6px', background: 'white', color: '#15803d', cursor: 'pointer' }}>
-                          Ändra tid
-                        </button>
-                      )}
                       <button onClick={() => toggleWorking(match.id, person.id)} disabled={saving}
                         style={{ fontSize: '12px', padding: '5px 10px', border: '1px solid #fca5a5', borderRadius: '6px', background: 'white', color: '#b91c1c', cursor: 'pointer' }}>
                         Ta bort
@@ -505,13 +652,16 @@ function MatchCard({ match, allPersonnel, isWorking, getWorkHoursForMatch, hasDe
           <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--gray-900)', lineHeight: 1 }}>{dayNum}</span>
           <span style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{dayName} {monthName}</span>
         </div>
-        <span style={{
-          fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '99px',
-          background: isFull ? '#dcfce7' : '#fee2e2',
-          color: isFull ? '#15803d' : '#b91c1c'
-        }}>
-          {workingCount}/{required}
-        </span>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {isClass3(match) && <Class3Badge />}
+          <span style={{
+            fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '99px',
+            background: isFull ? '#dcfce7' : '#fee2e2',
+            color: isFull ? '#15803d' : '#b91c1c'
+          }}>
+            {workingCount}/{required}
+          </span>
+        </div>
       </div>
 
       <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--gray-900)', marginBottom: '4px', lineHeight: 1.2 }}>
@@ -584,11 +734,13 @@ export default function ScheduleTab({
   expandedMonths, toggleMonth, groupMatchesByMonth,
   isWorking, getWorkingCount, hasWorkHours, getWorkHoursForMatch,
   hasDeviatingHours, getDetailedTooltip, calculateMileageForMatch,
-  toggleWorking, openTimeModal, updateMatch, deleteMatch, onAddMatch,
+  toggleWorking, openTimeModal, saveWorkTimeDirect, saveWorkTimeBulk, updateMatch, deleteMatch, onAddMatch,
   delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, onUpdateDeputySecurityResponsible,
   saving, currentPersonnelId, matchExtraCounts = {}, onExtrasChanged
 }) {
-  const [selectedMatch, setSelectedMatch] = useState(null)
+  const [selectedMatchId, setSelectedMatchId] = useState(null)
+  const selectedMatch = matches.find(m => m.id === selectedMatchId) || null
+  const setSelectedMatch = (m) => setSelectedMatchId(m ? m.id : null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   useModalBackButton(!!selectedMatch, () => setSelectedMatch(null))
   useModalBackButton(isEditModalOpen, () => setIsEditModalOpen(false))
@@ -610,6 +762,7 @@ export default function ScheduleTab({
 
   return (
     <div className="tab-content">
+      <style>{`.time-chip:hover{background:var(--gray-100) !important}`}</style>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
         <button className="btn btn-success" onClick={onAddMatch} disabled={saving}>
           + Lägg till evenemang
@@ -686,7 +839,8 @@ export default function ScheduleTab({
           getWorkHoursForMatch={getWorkHoursForMatch}
           hasDeviatingHours={hasDeviatingHours}
           toggleWorking={toggleWorking}
-          openTimeModal={openTimeModal}
+          saveWorkTimeDirect={saveWorkTimeDirect}
+          saveWorkTimeBulk={saveWorkTimeBulk}
           saving={saving}
           onClose={() => setSelectedMatch(null)}
           onEdit={() => setIsEditModalOpen(true)}
