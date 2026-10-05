@@ -5,8 +5,11 @@ import { calcPayroll } from '../../utils/timeUtils'
 // Löneberäkning per rad: sluttid uppåt till halvtimme, sedan matavdrag.
 // Säkerhetsuppdrag saknar klockslag – där dras bara matavdraget (0 h stannar på 0 h).
 // Matavdraget kan slås av per match (e.noMealDeduction sätts från matchens inställning).
+// Manuellt inlagda säkerhetsansvariguppdrag (security_duties, inte auto) har ingen matavdrag:
+// de timmar som är angivna är redan de timmar som ska betalas.
 function getPay(e) {
-  const ded = e.noMealDeduction ? 0 : MEAL_DEDUCTION_HOURS
+  const manualSecurity = e.type === 'security' && !e.auto
+  const ded = (e.noMealDeduction || manualSecurity) ? 0 : MEAL_DEDUCTION_HOURS
   if (e.type === 'work') {
     const p = calcPayroll(e.start_time, e.end_time, ded)
     if (p) return p
@@ -71,7 +74,7 @@ function summarizeByPerson(entries, personById, personByName) {
 const n2 = (v) => v.toFixed(2)
 
 function exportToCSV(entries, fromDate, toDate, personById, personByName) {
-  const headers = 'Datum,Evenemang,Personal,Typ,Starttid,Sluttid,Avrundad sluttid,Timmar (avrundade),Matavdrag (h),Lönetimmar,Bruttolön (kr),Milersättning (kr),Brutto minus milersättning (kr),Ersättning bortamatch (kr),Anteckningar\n'
+  const headers = 'Datum,Evenemang,Personal,Typ,Starttid,Sluttid,Avrundad sluttid,Timmar (avrundade),Matavdrag (h),Lönetimmar,Bruttolön (kr),Milersättning (kr),Brutto minus milersättning (kr),Milersättning säkerhetsuppdrag (kr),Anteckningar\n'
 
   const rows = entries.map(e => {
     const date = e.type === 'work' ? (e.work_date || e.matches?.date || '') : e.date
@@ -89,7 +92,7 @@ function exportToCSV(entries, fromDate, toDate, personById, personByName) {
 }
 
 function exportSummaryCSV(entries, fromDate, toDate, personById, personByName) {
-  const headers = 'Personal,Antal pass,Timmar (avrundade),Matavdrag (h),Lönetimmar,Bruttolön (kr),Milersättning (kr),Brutto minus milersättning (kr),Ersättning bortamatch (kr)\n'
+  const headers = 'Personal,Antal pass,Timmar (avrundade),Matavdrag (h),Lönetimmar,Bruttolön (kr),Milersättning (kr),Brutto minus milersättning (kr),Milersättning säkerhetsuppdrag (kr)\n'
   const rows = summarizeByPerson(entries, personById, personByName).map(r =>
     `"${r.name}",${r.shifts},${r.gross},${r.deduction},${r.payHours},${n2(r.brutto)},${n2(r.mileage)},${n2(r.net)},${r.away}`
   ).join('\n')
@@ -97,10 +100,63 @@ function exportSummaryCSV(entries, fromDate, toDate, personById, personByName) {
   download(headers + rows, `lon_summering_per_person_${suffix}.csv`)
 }
 
+async function exportToExcel(entries, fromDate, toDate, personById, personByName, warnings = [], excludedNames = []) {
+  const detailRows = [...entries]
+    .map(e => {
+      const isWork = e.type === 'work'
+      const p = getPay(e)
+      const m = getMoney(e, personById, personByName)
+      return {
+        date: isWork ? (e.work_date || e.matches?.date || '') : e.date,
+        event: isWork ? (e.matches?.opponent || '') : (e.opponent || ''),
+        name: entryName(e),
+        type: isWork ? 'Vakt' : 'Säkerhetsansvarig',
+        start: isWork ? (e.start_time || '') : '-',
+        end: isWork ? (e.end_time || '') : '-',
+        roundedEnd: p.roundedEnd,
+        gross: p.grossHours,
+        deduction: p.deduction,
+        payHours: p.payHours,
+        brutto: Math.round(m.brutto * 100) / 100,
+        mileage: Math.round(m.mileage * 100) / 100,
+        net: Math.round(m.net * 100) / 100,
+        away: awayCompensation(e),
+        notes: e.notes || '',
+      }
+    })
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.name.localeCompare(b.name, 'sv-SE'))
+
+  const summaryRows = summarizeByPerson(entries, personById, personByName).map(r => ({
+    ...r,
+    brutto: Math.round(r.brutto * 100) / 100,
+    mileage: Math.round(r.mileage * 100) / 100,
+    net: Math.round(r.net * 100) / 100,
+  }))
+
+  const suffix = fromDate || toDate ? `${fromDate || 'start'}_${toDate || 'slut'}` : 'alla'
+  const periodText = fromDate || toDate ? `${fromDate || 'start'} – ${toDate || 'slut'}` : 'Alla datum'
+  const rules = [
+    'Sluttiden rundas upp till närmaste halvtimme.',
+    `Matavdrag: ${MEAL_DEDUCTION_HOURS * 60} min per pass (kan vara avstängt för enskilda matcher).`,
+    `Lön: ${HOURLY_RATE} kr per lönetimme.`,
+    `Milersättning: tur/retur × mil × ${MILEAGE_RATE} kr per vaktpass, för vakter markerade "Får milersättning".`,
+    'Säkerhetsansvarig: bara manuellt inlagda uppdrag ingår, utan matavdrag. Säkerhetsansvarig som satts på en match ingår inte.',
+    'Milersättning säkerhetsuppdrag redovisas separat och ingår inte i bruttolönen.',
+    ...(excludedNames.length ? [`Ej med i underlaget (avbockade, t.ex. redan utbetalda): ${excludedNames.join(', ')}.`] : []),
+  ]
+  const { exportPayrollXlsx } = await import('../../utils/exportExcel')
+  await exportPayrollXlsx({
+    detailRows, summaryRows,
+    filename: `loneunderlag_${suffix}.xlsx`,
+    meta: { periodText, generatedAt: new Date(), rules, warnings },
+  })
+}
+
 export default function WorkHoursTab({ matches = [], personnel = [], workHours, securityDuties, allWorkEntries, saving, seasonFilter: seasonFilterProp, setSeasonFilter: setSeasonFilterProp, availableSeasons: availableSeasonsProp }) {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [personnelFilter, setPersonnelFilter] = useState('all')
+  const [excluded, setExcluded] = useState([]) // vakter som är avbockade (t.ex. redan fått lön)
   const [typeFilter, setTypeFilter] = useState('all')
   const [localSeasonFilter, setLocalSeasonFilter] = useState(seasonFilterProp || 'all')
   const seasonFilter = seasonFilterProp !== undefined ? seasonFilterProp : localSeasonFilter
@@ -108,7 +164,9 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
 
   // Matcher där matavdraget är avstängt → märk raderna så getPay hoppar över avdraget
   const matchById = Object.fromEntries(matches.map(m => [String(m.id), m]))
-  const annotatedEntries = allWorkEntries.map(e => {
+  // Säkerhetsansvarig som sätts på en match (auto) ska inte med på lönen – bara manuellt inlagda uppdrag.
+  const payrollEntries = allWorkEntries.filter(e => !(e.type === 'security' && e.auto))
+  const annotatedEntries = payrollEntries.map(e => {
     const matchId = e.type === 'work' ? e.match_id : (String(e.id).startsWith('auto_') ? String(e.id).slice(5) : null)
     const match = matchId != null ? matchById[String(matchId)] : null
     return match?.no_meal_deduction ? { ...e, noMealDeduction: true } : e
@@ -119,27 +177,44 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
 
   const allPersonnel = [...new Set([
     ...workHours.map(wh => wh.personnel?.name),
-    ...securityDuties.map(d => d.personnel_name)
+    ...securityDuties.filter(d => !d.auto).map(d => d.personnel_name)
   ].filter(Boolean))].sort()
 
   const availableSeasons = [...new Set(
     workHours.map(wh => wh.matches?.season).filter(Boolean)
   )].sort()
 
-  const filtered = annotatedEntries.filter(e => {
+  // Steg 1: period, typ och säsong. Steg 2: vilka vakter som är ikryssade.
+  const inPeriod = annotatedEntries.filter(e => {
     const date = e.type === 'work'
       ? (e.work_date || e.matches?.date || '')
       : e.date
     const name = e.type === 'work' ? e.personnel?.name : e.personnel_name
-    const season = e.type === 'work' ? e.matches?.season : null
+    // Säkerhetsuppdrag har egen säsong. Saknar ett manuellt uppdrag säsong kan vi inte avgöra den,
+    // och då tas det med hellre än att tyst utebli från lönen (datumfiltret styr ändå perioden).
+    const season = e.type === 'work' ? e.matches?.season : e.season
+    const seasonUnknown = e.type === 'security' && !season
 
     if (fromDate && date < fromDate) return false
     if (toDate && date > toDate) return false
     if (typeFilter !== 'all' && e.type !== typeFilter) return false
     if (personnelFilter !== 'all' && name !== personnelFilter) return false
-    if (seasonFilter !== 'all' && season !== seasonFilter) return false
+    if (seasonFilter !== 'all' && !seasonUnknown && season !== seasonFilter) return false
     return true
   })
+  const filtered = inPeriod.filter(e => !excluded.includes(entryName(e) || 'Okänd'))
+
+  // Vakter som har pass i vald period, med timmar – underlag för kryssrutorna
+  const periodPeople = Object.values(inPeriod.reduce((acc, e) => {
+    const n = entryName(e) || 'Okänd'
+    acc[n] ??= { name: n, shifts: 0, hours: 0 }
+    acc[n].shifts += 1
+    acc[n].hours += getPay(e).payHours
+    return acc
+  }, {})).sort((a, b) => a.name.localeCompare(b.name, 'sv-SE'))
+  const toggleExcluded = (n) => setExcluded(ex => ex.includes(n) ? ex.filter(x => x !== n) : [...ex, n])
+  const includedNames = new Set(filtered.map(e => entryName(e) || 'Okänd'))
+  const excludedInPeriod = periodPeople.filter(p => excluded.includes(p.name)).length
 
   const totalHours = filtered.reduce((t, e) => t + getPay(e).payHours, 0)
   const totalSalary = totalHours * HOURLY_RATE
@@ -148,7 +223,7 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
   const totalNet = summary.reduce((t, r) => t + r.net, 0)
   const notMarked = personnel.filter(p => !p.gets_mileage && parseFloat(p.commute_miles) > 0).map(p => p.name)
   const missingMiles = personnel.filter(p => p.gets_mileage && !(parseFloat(p.commute_miles) > 0)).map(p => p.name)
-  const hasFilter = fromDate || toDate || personnelFilter !== 'all' || typeFilter !== 'all' || seasonFilter !== 'all'
+  const hasFilter = fromDate || toDate || personnelFilter !== 'all' || typeFilter !== 'all' || seasonFilter !== 'all' || excluded.length > 0
 
   return (
     <div className="tab-content">
@@ -186,13 +261,39 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
           )}
           {hasFilter && (
             <button
-              onClick={() => { setFromDate(''); setToDate(''); setPersonnelFilter('all'); setTypeFilter('all'); setSeasonFilter('all') }}
+              onClick={() => { setFromDate(''); setToDate(''); setPersonnelFilter('all'); setTypeFilter('all'); setSeasonFilter('all'); setExcluded([]) }}
               style={{ fontSize: '12px', color: 'var(--gray-500)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Rensa filter
             </button>
           )}
         </div>
+
+        {/* Vilka vakter ska med? */}
+        {periodPeople.length > 0 && (
+          <details open style={{ marginBottom: '14px', border: '1px solid var(--gray-200)', borderRadius: '8px', padding: '10px 12px' }}>
+            <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--gray-700)' }}>
+              Vakter med i underlaget: {periodPeople.length - excludedInPeriod} av {periodPeople.length}
+              {excludedInPeriod > 0 && <span style={{ fontWeight: 400, color: '#b45309' }}> ({excludedInPeriod} avbockade)</span>}
+            </summary>
+            <div style={{ display: 'flex', gap: '12px', margin: '10px 0 8px', fontSize: '12px' }}>
+              <button type="button" onClick={() => setExcluded([])} style={{ background: 'none', border: 'none', color: 'var(--gray-500)', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>Markera alla</button>
+              <button type="button" onClick={() => setExcluded(periodPeople.map(p => p.name))} style={{ background: 'none', border: 'none', color: 'var(--gray-500)', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>Avmarkera alla</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '6px 16px' }}>
+              {periodPeople.map(p => {
+                const checked = !excluded.includes(p.name)
+                return (
+                  <label key={p.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer', opacity: checked ? 1 : 0.5 }}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleExcluded(p.name)} />
+                    <span style={{ flex: 1 }}>{p.name}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{p.shifts} pass · {p.hours.toFixed(1)} h</span>
+                  </label>
+                )
+              })}
+            </div>
+          </details>
+        )}
 
         {/* Summering + exportknapp */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
@@ -219,17 +320,27 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
           </div>
           <button
             className="btn btn-success"
+            onClick={() => exportToExcel(filtered, fromDate, toDate, personById, personByName, [
+              ...notMarked.filter(n => includedNames.has(n)).map(n => `${n}: har angett antal mil men är inte markerad "Får milersättning" (ingen ersättning räknas).`),
+              ...missingMiles.filter(n => includedNames.has(n)).map(n => `${n}: saknar antal mil (räknas som 0).`),
+            ], periodPeople.filter(p => excluded.includes(p.name)).map(p => p.name)).catch(err => alert('Kunde inte skapa Excel-filen: ' + err.message))}
+            disabled={saving || filtered.length === 0}
+          >
+            Exportera till Excel ({filtered.length} rader)
+          </button>
+          <button
+            className="btn btn-secondary"
             onClick={() => exportToCSV(filtered, fromDate, toDate, personById, personByName)}
             disabled={saving || filtered.length === 0}
           >
-            Exportera löneunderlag ({filtered.length} rader)
+            Exportera CSV ({filtered.length} rader)
           </button>
           <button
             className="btn btn-secondary"
             onClick={() => exportSummaryCSV(filtered, fromDate, toDate, personById, personByName)}
             disabled={saving || filtered.length === 0}
           >
-            Exportera summering per person
+            Exportera CSV-summering per person
           </button>
         </div>
       </div>
@@ -272,7 +383,7 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
                     <td><strong>{r.name}</strong></td>
                     <td className="text-center">{r.shifts}</td>
                     <td className="text-center">{r.gross.toFixed(1)}h</td>
-                    <td className="text-center">−{r.deduction.toFixed(1)}h</td>
+                    <td className="text-center">{r.deduction > 0 ? `−${r.deduction.toFixed(1)}h` : '-'}</td>
                     <td className="text-center"><strong>{r.payHours.toFixed(1)}h</strong></td>
                     <td className="text-center">{r.brutto.toLocaleString('sv-SE')} kr</td>
                     <td className="text-center">{r.mileage > 0 ? `−${r.mileage.toLocaleString('sv-SE')} kr` : '-'}</td>
