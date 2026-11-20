@@ -96,7 +96,7 @@ function buildEvent({ match, workHours, personnelId }) {
     `DTEND;TZID=${TZID}:${toIcsLocal(match.date, end, endNextDay)}`,
     `SUMMARY:${escapeText(summary)}`,
     `DESCRIPTION:${escapeText(desc)}`,
-    isAway ? null : 'LOCATION:Ljungby Arena',
+    isAway ? null : `LOCATION:${escapeText('SP Arena, Fritidsvägen 5, Ljungby')}`,
     'BEGIN:VALARM',
     'ACTION:DISPLAY',
     `DESCRIPTION:${escapeText(summary)}`,
