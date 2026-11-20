@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 import { HOURLY_RATE, MEAL_DEDUCTION_HOURS, MILEAGE_RATE } from '../../constants'
 import { calcPayroll } from '../../utils/timeUtils'
 
@@ -150,6 +151,98 @@ async function exportToExcel(entries, fromDate, toDate, personById, personByName
     filename: `loneunderlag_${suffix}.xlsx`,
     meta: { periodText, generatedAt: new Date(), rules, warnings },
   })
+}
+
+// ─── Löneutbetalningar ────────────────────────────────────────────────────────
+// Admin markerar vilka perioder som är utbetalda. Vakterna ser i sin vy vilka
+// pass som är utbetalda och vad som återstår till nästa utbetalning.
+
+const fmtD = (d) => d ? new Date(d + 'T12:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' }) : '–'
+const todayIso = () => new Date().toISOString().split('T')[0]
+
+function PayoutsPanel({ fromDate, toDate }) {
+  const [payouts, setPayouts] = useState([])
+  const [open, setOpen] = useState(false)
+  const [periodStart, setPeriodStart] = useState('')
+  const [periodEnd, setPeriodEnd] = useState('')
+  const [paidOn, setPaidOn] = useState(todayIso())
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = async () => {
+    const { data, error } = await supabase.from('payouts').select('*').order('period_end', { ascending: false })
+    if (!error) setPayouts(data || [])
+  }
+  useEffect(() => { load() }, [])
+
+  const startForm = () => {
+    const lastEnd = payouts[0]?.period_end
+    const dayAfter = lastEnd ? new Date(new Date(lastEnd + 'T12:00').getTime() + 86400000).toISOString().split('T')[0] : ''
+    setPeriodStart(fromDate || dayAfter)
+    setPeriodEnd(toDate || '')
+    setPaidOn(todayIso())
+    setNote('')
+    setError('')
+    setOpen(true)
+  }
+
+  const save = async () => {
+    if (!periodEnd) { setError('Ange vilket datum utbetalningen gäller till och med.'); return }
+    if (periodStart && periodStart > periodEnd) { setError('Startdatum måste vara före slutdatum.'); return }
+    setBusy(true)
+    const { error } = await supabase.from('payouts').insert([{ period_start: periodStart || null, period_end: periodEnd, paid_on: paidOn || todayIso(), note: note.trim() || null }])
+    setBusy(false)
+    if (error) { setError('Kunde inte spara: ' + error.message); return }
+    setOpen(false)
+    load()
+  }
+
+  const remove = async (p) => {
+    if (!window.confirm(`Ta bort markeringen för lönen ${fmtD(p.paid_on)}? Passen visas då som ej utbetalda igen.`)) return
+    await supabase.from('payouts').delete().eq('id', p.id)
+    load()
+  }
+
+  const inp = { padding: '8px 10px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '14px' }
+
+  return (
+    <div style={{ background: 'white', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px', boxShadow: 'var(--shadow-sm)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '15px' }}>Löneutbetalningar</div>
+          <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Markerade perioder visas som utbetalda för vakterna.</div>
+        </div>
+        {!open && <button className="btn btn-primary" onClick={startForm}>Markera utbetalning</button>}
+      </div>
+
+      {open && (
+        <div style={{ marginTop: '12px', padding: '12px', background: 'var(--gray-50)', borderRadius: '8px', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'flex-end' }}>
+          <label style={{ fontSize: '12px', color: 'var(--gray-600)' }}>Pass från<br /><input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={inp} /></label>
+          <label style={{ fontSize: '12px', color: 'var(--gray-600)' }}>till och med<br /><input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={inp} /></label>
+          <label style={{ fontSize: '12px', color: 'var(--gray-600)' }}>Utbetald den<br /><input type="date" value={paidOn} onChange={e => setPaidOn(e.target.value)} style={inp} /></label>
+          <label style={{ fontSize: '12px', color: 'var(--gray-600)', flex: '1 1 160px' }}>Anteckning (valfritt)<br /><input type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="Decemberlönen" style={{ ...inp, width: '100%' }} /></label>
+          <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? 'Sparar…' : 'Spara'}</button>
+          <button className="btn btn-secondary" onClick={() => setOpen(false)}>Avbryt</button>
+          {error && <div style={{ width: '100%', fontSize: '13px', color: '#b91c1c' }}>{error}</div>}
+        </div>
+      )}
+
+      {payouts.length > 0 && (
+        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {payouts.map(p => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', padding: '8px 10px', border: '1px solid var(--gray-200)', borderRadius: '8px' }}>
+              <span style={{ fontWeight: 600 }}>Utbetald {fmtD(p.paid_on)}</span>
+              <span style={{ color: 'var(--gray-600)', flex: 1 }}>
+                pass {p.period_start ? `${fmtD(p.period_start)} – ` : 't.o.m. '}{fmtD(p.period_end)}{p.note ? `, ${p.note}` : ''}
+              </span>
+              <button onClick={() => remove(p)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Ta bort</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function WorkHoursTab({ matches = [], personnel = [], workHours, securityDuties, allWorkEntries, saving, seasonFilter: seasonFilterProp, setSeasonFilter: setSeasonFilterProp, availableSeasons: availableSeasonsProp }) {
@@ -344,6 +437,8 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
           </button>
         </div>
       </div>
+
+      <PayoutsPanel fromDate={fromDate} toDate={toDate} />
 
       <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '12px' }}>
         Löneberäkning: sluttiden rundas upp till närmaste halvtimme, därefter dras matavdrag på {MEAL_DEDUCTION_HOURS * 60} min per pass.

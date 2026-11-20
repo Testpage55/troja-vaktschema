@@ -40,6 +40,9 @@ function fmtDate(dateStr, short = false) {
   return date.toLocaleDateString('sv-SE', { weekday:'long', day:'numeric', month:'long' })
 }
 
+const fmtH = (h) => (Math.round(h * 10) / 10).toLocaleString('sv-SE')
+const fmtShortDate = (d) => d ? new Date(d + 'T12:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }).replace('.', '') : ''
+
 // ─── Countdown ───────────────────────────────────────────────────────────────
 
 function Countdown({ cd }) {
@@ -574,118 +577,199 @@ function ScheduleModal({ assignments, onClose, personnelId, personnelName }) {
 
 // ─── MyHours ─────────────────────────────────────────────────────────────────
 
-function MyHours({ personnelId }) {
+function MyHours({ personnelId, onEdit, refreshKey }) {
   const [allHours, setAllHours] = useState([])
-  const [delegatesMap, setDelegatesMap] = useState({})
+  const [payouts, setPayouts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showAll, setShowAll] = useState(false)
-  const [seasonFilter, setSeasonFilter] = useState(null)
-  const [availableSeasons, setAvailableSeasons] = useState([])
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
+  const [filter, setFilter] = useState(null) // 'unpaid' | 'payout:<id>' | 'season:<s>'
+  const [selectedMonths, setSelectedMonths] = useState([]) // flera månader kan väljas
+  const [periodFrom, setPeriodFrom] = useState('')
+  const [periodTo, setPeriodTo] = useState('')
 
-  useEffect(() => { fetchHours() }, [personnelId])
+  useEffect(() => { fetchHours() }, [personnelId, refreshKey])
 
   const fetchHours = async () => {
-    const [{ data }, { data: activeAssignments }] = await Promise.all([
-      supabase.from('work_hours').select('*, matches(date,opponent,time,match_type,season,attendance)').eq('personnel_id', personnelId).lt('work_date', new Date().toISOString().split('T')[0]).order('work_date', { ascending: true }),
+    const todayStr = new Date().toISOString().split('T')[0]
+    const [{ data }, { data: activeAssignments }, { data: pays }] = await Promise.all([
+      supabase.from('work_hours').select('*, matches(id,date,opponent,time,match_type,season,attendance)').eq('personnel_id', personnelId).lt('work_date', todayStr).order('work_date', { ascending: true }),
       supabase.from('assignments').select('match_id').eq('personnel_id', personnelId).eq('is_working', true),
+      supabase.from('payouts').select('*').order('period_end', { ascending: false }),
     ])
     const activeMatchIds = new Set((activeAssignments || []).map(a => a.match_id))
     const all = (data || []).filter(wh => activeMatchIds.has(wh.match_id))
-
-    const matchIds = all.map(wh => wh.match_id)
-    if (matchIds.length > 0) {
-      const { data: dels } = await supabase.from('delegates').select('match_id, name').in('match_id', matchIds)
-      const map = {}
-      ;(dels || []).forEach(d => { if (!map[d.match_id]) map[d.match_id] = []; map[d.match_id].push(d.name) })
-      setDelegatesMap(map)
-    }
-    const seasons = [...new Set(all.map(wh => wh.matches?.season).filter(Boolean))].sort().reverse()
-    setAvailableSeasons(seasons)
-    setSeasonFilter(seasons[0] || null)
     setAllHours(all)
+    setPayouts(pays || [])
     setLoading(false)
   }
 
-  const hours = allHours
-    .filter(wh => !seasonFilter || wh.matches?.season === seasonFilter)
-    .filter(wh => !fromDate || wh.work_date >= fromDate)
-    .filter(wh => !toDate || wh.work_date <= toDate)
-  const totalHours = hours.reduce((s,wh) => s + (parseFloat(wh.total_hours)||calcHours(wh.start_time,wh.end_time)), 0)
-  const shown = showAll ? hours : hours.slice(0,5)
+  // Vilken utbetalning ett pass hör till (null = ej utbetalt)
+  const payoutFor = (date) => payouts.find(p => date <= p.period_end && (!p.period_start || date >= p.period_start)) || null
+  const hoursOf = (wh) => parseFloat(wh.total_hours) || calcHours(wh.start_time, wh.end_time)
+  const enriched = allHours.map(wh => ({ ...wh, payout: payoutFor(wh.work_date), h: hoursOf(wh) }))
+
+  const seasons = [...new Set(enriched.map(wh => wh.matches?.season).filter(Boolean))].sort().reverse()
+  const unpaidCount = enriched.filter(wh => !wh.payout).length
+  const activeFilter = filter || (payouts.length && unpaidCount ? 'unpaid' : seasons[0] ? `season:${seasons[0]}` : 'all')
+
+  const shown = enriched.filter(wh => {
+    if (activeFilter === 'unpaid') return !wh.payout
+    if (activeFilter.startsWith('payout:')) return wh.payout && String(wh.payout.id) === activeFilter.slice(7)
+    if (activeFilter.startsWith('season:')) return wh.matches?.season === activeFilter.slice(7)
+    if (activeFilter === 'custom') return (!periodFrom || wh.work_date >= periodFrom) && (!periodTo || wh.work_date <= periodTo)
+    return true
+  })
+
+  // Månader för staplarna (C) och grupperingen (A)
+  const monthKey = (d) => d.slice(0, 7)
+  const monthName = (k, long = false) => new Date(k + '-15T12:00').toLocaleDateString('sv-SE', long ? { month: 'long', year: 'numeric' } : { month: 'short' }).replace('.', '')
+  const months = Object.values(shown.reduce((acc, wh) => {
+    const k = monthKey(wh.work_date)
+    acc[k] ??= { key: k, items: [], hours: 0, paid: 0 }
+    acc[k].items.push(wh); acc[k].hours += wh.h; if (wh.payout) acc[k].paid += wh.h
+    return acc
+  }, {})).sort((a, b) => a.key.localeCompare(b.key))
+  const maxH = Math.max(1, ...months.map(m => m.hours))
+  const validSel = selectedMonths.filter(k => months.some(m => m.key === k))
+  const hasSel = validSel.length > 0
+  const listMonths = [...months].reverse().filter(m => !hasSel || validSel.includes(m.key))
+  const inView = listMonths.flatMap(m => m.items)
+  const total = inView.reduce((s, wh) => s + wh.h, 0)
+  const toggleMonth = (k) => setSelectedMonths(sel => sel.includes(k) ? sel.filter(x => x !== k) : [...sel, k])
+  const selLabel = [...validSel].sort().map(k => monthName(k)).join(' + ')
+  const passTxt = (n) => `${n} pass`
+
+  // Utbetalningsmarkering i listan: visas ovanför det senaste passet som ingår i utbetalningen
+  const payoutMarkerBefore = new Map()
+  ;[...shown].sort((a, b) => b.work_date.localeCompare(a.work_date)).forEach(wh => {
+    if (wh.payout && !payoutMarkerBefore.has(wh.payout.id)) payoutMarkerBefore.set(wh.payout.id, wh.id)
+  })
+
+  const chips = [
+    ...(payouts.length ? [{ key: 'unpaid', label: `Ej utbetalt${unpaidCount ? ` (${unpaidCount})` : ''}` }] : []),
+    ...payouts.slice(0, 3).map(p => ({ key: `payout:${p.id}`, label: `Lön ${fmtShortDate(p.paid_on)}` })),
+    ...seasons.map(s => ({ key: `season:${s}`, label: `Säsong ${s}` })),
+    { key: 'custom', label: 'Egen period' },
+  ]
+
+  const isoDay = (d) => d.toISOString().split('T')[0]
+  const openCustom = () => {
+    if (!periodFrom && !periodTo) {
+      const last = payouts[0]?.period_end
+      setPeriodFrom(last ? isoDay(new Date(new Date(last + 'T12:00').getTime() + 86400000)) : (enriched[0]?.work_date || ''))
+      setPeriodTo(isoDay(new Date()))
+    }
+    setFilter('custom'); setSelectedMonths([])
+  }
+  const fmtLong = (d) => d ? new Date(d + 'T12:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }).replace('.', '') : '…'
 
   return (
     <div className="guard-card">
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', gap:'12px' }}>
-        <h2 className="guard-card-title" style={{ margin:0 }}>Mina Arbetstider</h2>
-        <div style={{ background:'linear-gradient(135deg,#10b981 0%,#059669 100%)', color:'white', padding:'6px 14px', borderRadius:'12px', fontSize:'13px', fontWeight:'600', display:'flex', gap:'6px', flexShrink:0 }}>
-          <span>{hours.length} pass</span><span>·</span><span>{totalHours.toFixed(1)}h</span>
-        </div>
+      <h2 className="guard-card-title" style={{ margin:'0 0 10px' }}>Mina arbetstider</h2>
+      <div className="mh-stats" aria-live="polite">
+        <div className="mh-stat"><span className="mh-stat-val">{inView.length}</span><span className="mh-stat-lbl">pass</span></div>
+        <div className="mh-stat"><span className="mh-stat-val">{fmtH(total)}</span><span className="mh-stat-lbl">timmar</span></div>
+        <div className="mh-stat"><span className="mh-stat-val">{inView.length ? fmtH(total / inView.length) : '–'}</span><span className="mh-stat-lbl">h per pass</span></div>
+      </div>
+      <div className="mh-sub">
+        <span>{hasSel ? <>Visar <strong>{selLabel}</strong></> : activeFilter === 'unpaid' ? 'Pass som inte är utbetalda än' : activeFilter.startsWith('season:') ? `Hela säsongen ${activeFilter.slice(7)}` : activeFilter.startsWith('payout:') ? 'Pass som ingick i lönen' : activeFilter === 'custom' ? <>Visar <strong>{fmtLong(periodFrom)} – {fmtLong(periodTo)}</strong></> : 'Alla pass'}</span>
+        {hasSel && <button className="mh-clear" onClick={() => setSelectedMonths([])}>Visa alla månader</button>}
       </div>
 
-      {availableSeasons.length >= 1 && (
-        <div style={{ display:'flex', gap:'8px', flexWrap:'wrap', marginBottom:'12px' }}>
-          {availableSeasons.map(s => (
-            <button key={s} onClick={() => { setSeasonFilter(s); setShowAll(false); setFromDate(''); setToDate('') }}
-              style={{ padding:'6px 14px', borderRadius:'99px', fontSize:'13px', fontWeight:'600', border:'none', cursor:'pointer', background: seasonFilter===s ? 'linear-gradient(135deg,#10b981,#059669)' : 'white', color: seasonFilter===s ? 'white' : '#4a5568', boxShadow: seasonFilter===s ? '0 2px 8px rgba(16,185,129,0.4)' : 'var(--shadow-sm)', minHeight:'36px', touchAction:'manipulation' }}>
-              {s}
+      {chips.length > 1 && (
+        <div className="mh-chips">
+          {chips.map(c => (
+            <button key={c.key} className={`mh-chip${activeFilter === c.key ? ' is-active' : ''}`} aria-pressed={activeFilter === c.key}
+              onClick={() => c.key === 'custom' ? openCustom() : (setFilter(c.key), setSelectedMonths([]))}>
+              {c.label}
             </button>
           ))}
         </div>
       )}
 
-      {/* Periodfilter */}
-      <div style={{ display:'flex', gap:'8px', marginBottom:'16px', alignItems:'center', flexWrap:'wrap' }}>
-        <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setSeasonFilter(null); setShowAll(false) }}
-          style={{ flex:'1 1 120px', minWidth:'120px', padding:'7px 10px', border:'1.5px solid #e5e7eb', borderRadius:'10px', fontSize:'13px', color:'#374151', outline:'none' }} />
-        <span style={{ color:'#9ca3af', fontSize:'13px' }}>–</span>
-        <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setSeasonFilter(null); setShowAll(false) }}
-          style={{ flex:'1 1 120px', minWidth:'120px', padding:'7px 10px', border:'1.5px solid #e5e7eb', borderRadius:'10px', fontSize:'13px', color:'#374151', outline:'none' }} />
-        {(fromDate || toDate) && (
-          <button onClick={() => { setFromDate(''); setToDate(''); setSeasonFilter(availableSeasons[0]||null) }}
-            style={{ padding:'7px 10px', border:'none', borderRadius:'10px', background:'#fee2e2', color:'#b91c1c', fontSize:'12px', fontWeight:'600', cursor:'pointer', whiteSpace:'nowrap' }}>
-            Rensa
-          </button>
-        )}
-      </div>
+      {activeFilter === 'custom' && (
+        <div className="mh-period">
+          <label>Från<input type="date" value={periodFrom} max={periodTo || undefined} onChange={e => { setPeriodFrom(e.target.value); setSelectedMonths([]) }} /></label>
+          <label>Till och med<input type="date" value={periodTo} min={periodFrom || undefined} onChange={e => { setPeriodTo(e.target.value); setSelectedMonths([]) }} /></label>
+          {payouts.length > 0 && (
+            <div className="mh-period-quick">
+              {payouts.slice(0, 2).map(p => (
+                <button key={p.id} onClick={() => { setPeriodFrom(isoDay(new Date(new Date(p.period_end + 'T12:00').getTime() + 86400000))); setPeriodTo(isoDay(new Date())) }}>
+                  Efter {fmtLong(p.period_end)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {loading ? (
-        <div style={{ textAlign:'center', padding:'32px', color:'#6b7280' }}>Laddar...</div>
-      ) : hours.length === 0 ? (
-        <div style={{ textAlign:'center', padding:'32px', color:'#6b7280', background:'#f8fafc', borderRadius:'12px', border:'2px dashed #cbd5e0' }}>
-          <div style={{ fontWeight:'600', color:'#374151', marginBottom:'8px' }}>Inga arbetstider än</div>
-          <div style={{ fontSize:'14px' }}>Genomförda pass visas här.</div>
+        <div className="tl-empty">Hämtar arbetstider…</div>
+      ) : shown.length === 0 ? (
+        <div className="tl-empty">
+          <strong>{activeFilter === 'unpaid' ? 'Allt är utbetalt' : 'Inga pass här'}</strong>
+          {activeFilter === 'unpaid' ? 'Nya pass hamnar här tills nästa löneutbetalning.' : 'Genomförda pass visas här efter matchdagen.'}
         </div>
       ) : (
         <>
-          <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-            {shown.map(wh => (
-              <div key={wh.id} style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'12px', padding:'12px', display:'flex', alignItems:'center', gap:'10px' }}>
-                <div style={{ background:'#ef4444', color:'white', padding:'4px 8px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', minWidth:'46px', textAlign:'center', flexShrink:0 }}>
-                  {fmtDate(wh.work_date, true)}
+          {months.length > 1 && (
+            <div className="mh-chart" role="group" aria-label="Timmar per månad">
+              {months.map(m => {
+                const sel = validSel.includes(m.key)
+                const paidPct = m.hours ? (m.paid / m.hours) * 100 : 0
+                return (
+                  <button key={m.key} className={`mh-bar${sel ? ' is-selected' : ''}${hasSel && !sel ? ' is-dim' : ''}`}
+                    onClick={() => toggleMonth(m.key)} aria-pressed={sel}
+                    aria-label={`${monthName(m.key, true)}: ${passTxt(m.items.length)}, ${fmtH(m.hours)} timmar`}>
+                    <span className="mh-bar-val">{fmtH(m.hours)}</span>
+                    <span className="mh-bar-col" style={{ height: `${Math.max(6, (m.hours / maxH) * 64)}px` }}>
+                      <span className="mh-bar-paid" style={{ height: `${paidPct}%` }} />
+                    </span>
+                    <span className="mh-bar-lbl">{monthName(m.key)}</span>
+                    <span className="mh-bar-cnt">{m.items.length} st</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {months.length > 1 && (
+            <div className="mh-legend">
+              {payouts.length > 0 && <><span className="mh-dot is-unpaid" />Ej utbetalt <span className="mh-dot is-paid" />Utbetalt</>}
+              <span className="mh-legend-tip">{hasSel ? 'Tryck på fler månader för att lägga ihop' : 'Tryck på månader för att räkna ihop dem'}</span>
+            </div>
+          )}
+
+          <div className="mh-list">
+            {listMonths.map(m => (
+              <div key={m.key}>
+                <div className="mh-month">
+                  <span>{monthName(m.key, true)}</span>
+                  <span>{passTxt(m.items.length)}, {fmtH(m.hours)} h</span>
                 </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:'600', color:'#1f2937', fontSize:'14px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{wh.matches?.opponent||'Uppdrag'}</div>
-                  <div style={{ fontSize:'12px', color:'#718096', display:'flex', gap:'6px', flexWrap:'wrap', marginTop:'1px' }}>
-                    <span>{fmtTime(wh.start_time)} – {fmtTime(wh.end_time)}</span>
-                    {wh.matches?.attendance && <span style={{ color:'#9ca3af' }}>· 👥 {wh.matches.attendance.toLocaleString('sv-SE')}</span>}
-                    {delegatesMap[wh.match_id]?.length > 0 && <span style={{ color:'#7c3aed', fontWeight:'600' }}>· 🎖 Delegat</span>}
+                {[...m.items].reverse().map(wh => (
+                  <div key={wh.id}>
+                    {wh.payout && payoutMarkerBefore.get(wh.payout.id) === wh.id && (
+                      <div className="mh-payout">
+                        Lön utbetald {fmtShortDate(wh.payout.paid_on)}, pass t.o.m. {fmtShortDate(wh.payout.period_end)}
+                      </div>
+                    )}
+                    <button className={`mh-row${wh.payout ? ' is-paid' : ''}`}
+                      onClick={() => !wh.payout && onEdit?.({ id: `wh-${wh.id}`, match_id: wh.match_id, matches: wh.matches, workHours: wh })}
+                      disabled={!!wh.payout}
+                      title={wh.payout ? 'Passet är utbetalt och kan inte ändras' : 'Ändra tider'}>
+                      <span className="mh-date">{new Date(wh.work_date + 'T12:00').getDate()}/{new Date(wh.work_date + 'T12:00').getMonth() + 1}</span>
+                      <span className="mh-body">
+                        <span className="mh-opp">{wh.matches?.opponent || 'Uppdrag'}</span>
+                        <span className="mh-time">{fmtTime(wh.start_time)}–{fmtTime(wh.end_time)}{wh.matches?.attendance ? `, ${wh.matches.attendance.toLocaleString('sv-SE')} åskådare` : ''}</span>
+                      </span>
+                      <span className="mh-h">{fmtH(wh.h)} h</span>
+                      <span className="mh-go" aria-hidden="true">{wh.payout ? '✓' : '›'}</span>
+                    </button>
                   </div>
-                </div>
-                <div style={{ background:'#10b981', color:'white', padding:'4px 10px', borderRadius:'12px', fontSize:'12px', fontWeight:'700', flexShrink:0 }}>
-                  {(parseFloat(wh.total_hours)||calcHours(wh.start_time,wh.end_time)).toFixed(1)}h
-                </div>
+                ))}
               </div>
             ))}
           </div>
-          {hours.length > 3 && (
-            <div style={{ textAlign:'center', marginTop:'16px' }}>
-              <button onClick={()=>setShowAll(v=>!v)} style={{ background:'transparent', border:'2px solid #10b981', color:'#10b981', borderRadius:'12px', padding:'8px 24px', fontSize:'14px', fontWeight:'600', cursor:'pointer', touchAction:'manipulation' }}>
-                {showAll ? `Visa färre` : `Visa alla (${hours.length-3} till)`}
-              </button>
-            </div>
-          )}
+          {unpaidCount > 0 && <div className="mh-hint">Tryck på ett pass för att ändra tiderna. Utbetalda pass är låsta.</div>}
         </>
       )}
     </div>
@@ -780,6 +864,7 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmi
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingAssignment, setEditingAssignment] = useState(null)
+  const [hoursRefresh, setHoursRefresh] = useState(0)
   const [showSchedule, setShowSchedule] = useState(false)
   const [fxOn, setFxOn] = useState(effectsEnabled())
   const toggleFx = () => {
@@ -858,7 +943,7 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmi
       <div className="guard-content">
         <NextMatch personnelId={personnelId} />
         <AssignedMatches assignments={assignments} onEditTimes={setEditingAssignment} personnelId={personnelId} isAdmin={isAdmin} />
-        <MyHours personnelId={personnelId} />
+        <MyHours personnelId={personnelId} onEdit={setEditingAssignment} refreshKey={hoursRefresh} />
       </div>
 
       {showSchedule && <ScheduleModal assignments={assignments} personnelId={personnelId} personnelName={personnelName} onClose={() => setShowSchedule(false)} />}
@@ -867,7 +952,7 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmi
           assignment={editingAssignment}
           personnelId={personnelId}
           onClose={()=>setEditingAssignment(null)}
-          onSave={()=>{ setEditingAssignment(null); fetchAssignments(); iceBurst(window.innerWidth / 2, window.innerHeight * 0.65) }}
+          onSave={()=>{ setEditingAssignment(null); fetchAssignments(); setHoursRefresh(n => n + 1); iceBurst(window.innerWidth / 2, window.innerHeight * 0.65) }}
         />
       )}
 

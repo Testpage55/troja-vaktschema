@@ -1470,3 +1470,97 @@ html {
   .guard-app input:not([inputmode="numeric"]), .guard-app textarea, .guard-app select,
   .mob-modal-sheet input:not([inputmode="numeric"]), .mob-modal-sheet textarea, .mob-modal-sheet select { font-size: 16px !important; }
 }
+
+/* ── Mina arbetstider: staplar per månad + lista per månad ─────── */
+.mh-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.mh-total { font-size: 22px; font-weight: 800; color: #b91c1c; font-variant-numeric: tabular-nums; }
+.mh-sub { font-size: 13px; color: #6b7280; margin: 2px 0 12px; }
+.mh-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.mh-chip {
+  padding: 6px 12px; border-radius: 99px; border: 1px solid #fecaca; background: #fff;
+  color: #b91c1c; font-size: 13px; font-weight: 600; cursor: pointer; touch-action: manipulation;
+}
+.mh-chip.is-active { background: #dc2626; border-color: #dc2626; color: #fff; }
+
+.mh-chart {
+  display: flex; align-items: flex-end; gap: 6px; height: 104px;
+  padding: 0 2px 0; border-bottom: 1px solid #f1f5f9; margin-bottom: 6px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.mh-bar {
+  flex: 1 0 34px; max-width: 64px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  gap: 3px; background: none; border: 0; padding: 0; cursor: pointer; height: 100%;
+}
+.mh-bar-val { font-size: 11px; color: #6b7280; font-variant-numeric: tabular-nums; }
+.mh-bar-col {
+  position: relative; width: 100%; border-radius: 6px 6px 0 0; background: #dc2626; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.mh-bar-paid { display: block; width: 100%; background: #fecaca; }
+.mh-bar-lbl { font-size: 11px; color: #6b7280; padding-bottom: 2px; }
+.mh-bar.is-selected .mh-bar-lbl, .mh-bar.is-selected .mh-bar-val { color: #b91c1c; font-weight: 700; }
+.mh-bar.is-dim { opacity: .4; }
+.mh-legend { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #6b7280; margin-bottom: 8px; }
+.mh-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.mh-dot.is-unpaid { background: #dc2626; }
+.mh-dot.is-paid { background: #fecaca; margin-left: 8px; }
+
+.mh-list { margin-top: 4px; }
+.mh-month {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: 12px; color: #6b7280; padding: 12px 0 4px; border-bottom: 1px solid #e5e7eb;
+}
+.mh-month span:first-child { text-transform: capitalize; font-weight: 600; color: #374151; }
+.mh-payout {
+  margin: 8px 0 2px; padding: 6px 10px; border-radius: 8px;
+  background: #ecfdf5; color: #065f46; font-size: 12px; font-weight: 600;
+  border-left: 0; text-align: center;
+}
+.mh-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 2px; background: none; border: 0; border-bottom: 1px solid #f3f4f6;
+  text-align: left; cursor: pointer; font: inherit; color: inherit; touch-action: manipulation;
+}
+.mh-row:hover:not(:disabled) { background: #fef2f2; }
+.mh-row:disabled { cursor: default; }
+.mh-row.is-paid .mh-opp, .mh-row.is-paid .mh-h { color: #6b7280; }
+.mh-date { width: 40px; flex-shrink: 0; font-size: 13px; font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }
+.mh-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mh-opp { font-size: 14px; font-weight: 600; color: #1f2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mh-time { font-size: 12px; color: #6b7280; font-variant-numeric: tabular-nums; }
+.mh-h { font-size: 14px; font-weight: 700; color: #1f2937; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.mh-go { width: 14px; text-align: center; color: #9ca3af; font-size: 16px; flex-shrink: 0; }
+.mh-row.is-paid .mh-go { color: #10b981; font-size: 13px; }
+.mh-hint { font-size: 12px; color: #9ca3af; margin-top: 10px; }
+.mh-chip:focus-visible, .mh-bar:focus-visible, .mh-row:focus-visible { outline: 3px solid #fca5a5; outline-offset: 2px; }
+
+/* Nyckeltal + flera valda månader */
+.mh-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+.mh-stat { background: #fef2f2; border-radius: 12px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; }
+.mh-stat-val { font-size: 24px; font-weight: 800; color: #b91c1c; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.mh-stat-lbl { font-size: 12px; color: #7f1d1d; }
+.mh-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.mh-sub strong { color: #b91c1c; }
+.mh-clear { background: none; border: 0; padding: 0; color: #dc2626; font-size: 13px; font-weight: 600; cursor: pointer; }
+.mh-chart { height: 118px; }
+.mh-bar-cnt { font-size: 10px; color: #9ca3af; margin-top: -3px; padding-bottom: 2px; }
+.mh-bar.is-selected .mh-bar-col { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #dc2626; }
+.mh-bar.is-selected .mh-bar-cnt { color: #b91c1c; }
+.mh-legend { flex-wrap: wrap; }
+.mh-legend-tip { margin-left: auto; color: #9ca3af; }
+
+/* Egen period (t.ex. lönebrytet mitt i december) */
+.mh-period {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+  background: #fef2f2; border-radius: 12px; padding: 10px; margin: -4px 0 14px;
+}
+.mh-period label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #7f1d1d; min-width: 0; }
+.mh-period input {
+  width: 100%; min-width: 0; height: 40px; padding: 0 8px; border: 1px solid #fecaca; border-radius: 8px;
+  background: #fff; color: #1f2937; font: inherit; font-size: 15px; font-weight: 500;
+}
+.mh-period-quick { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.mh-period-quick button {
+  padding: 4px 10px; border-radius: 99px; border: 1px dashed #fca5a5; background: #fff;
+  color: #b91c1c; font-size: 12px; font-weight: 600; cursor: pointer;
+}
