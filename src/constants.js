@@ -1,4 +1,5 @@
-export const REGULAR_GUARDS = ['Micke', 'Jocke', 'Patrik', 'Gary', 'Jozsef', 'Tomas']
+// Ordinarie vakt styrs av kolumnen personnel.is_regular (ändras under Personal-fliken)
+export const isRegularGuard = (person) => !!person?.is_regular
 
 export const SECURITY_RESPONSIBLE = ['Patrik', 'Micke']
 

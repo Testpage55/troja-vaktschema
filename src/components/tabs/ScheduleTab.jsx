@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import TimeInput from '../TimeInput'
 import { useModalBackButton } from '../../hooks/useModalBackButton'
-import { SECURITY_RESPONSIBLE, REGULAR_GUARDS } from '../../constants'
+import { SECURITY_RESPONSIBLE, isRegularGuard } from '../../constants'
 import EditMatchModal from '../modals/EditMatchModal'
 import { supabase } from '../../lib/supabase'
 import { calculateWorkTimes } from '../../utils/timeUtils'
@@ -38,8 +39,8 @@ function PersonRow({ person, match, toggleWorking, saving }) {
 function NotWorkingList({ match, notWorkingPersonnel, allPersonnel, isWorking, toggleWorking, saving, search, q }) {
   const [showExtra, setShowExtra] = useState(false)
 
-  const regularNotWorking = notWorkingPersonnel.filter(p => REGULAR_GUARDS.includes(p.name))
-  const extraNotWorking = notWorkingPersonnel.filter(p => !REGULAR_GUARDS.includes(p.name))
+  const regularNotWorking = notWorkingPersonnel.filter(p => isRegularGuard(p))
+  const extraNotWorking = notWorkingPersonnel.filter(p => !isRegularGuard(p))
   const totalNotWorking = allPersonnel.filter(p => !isWorking(match, p.id)).length
 
   return (
@@ -184,9 +185,9 @@ function TimeEditor({ match, person, wh, onSave, outlier = false }) {
   const hrs = calcHours(start, end)
   return (
     <div onClick={stop} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-      <input type="time" value={start} onChange={e => setStart(e.target.value)} onKeyDown={onKey} autoFocus style={inp} aria-label="Starttid" />
+      <TimeInput value={start} onChange={e => setStart(e.target.value)} onKeyDown={onKey} autoFocus style={inp} aria-label="Starttid" />
       <span style={{ color: 'var(--gray-400)' }}>–</span>
-      <input type="time" value={end} onChange={e => setEnd(e.target.value)} onKeyDown={onKey} style={inp} aria-label="Sluttid" />
+      <TimeInput value={end} onChange={e => setEnd(e.target.value)} onKeyDown={onKey} style={inp} aria-label="Sluttid" />
       <span style={{ fontSize: '12px', color: 'var(--gray-500)', minWidth: '34px' }}>{start && end && start !== end ? `${hrs}h` : ''}</span>
       <button onClick={save} disabled={busy || !start || !end || start === end} aria-label="Spara"
         style={{ border: 'none', background: '#16a34a', color: 'white', borderRadius: '6px', padding: '4px 9px', cursor: 'pointer', fontSize: '13px' }}>✓</button>
@@ -240,9 +241,9 @@ function BulkTimeEditor({ match, workingPersonnel, getWorkHoursForMatch, onSave 
   return (
     <div onClick={stop} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', padding: '8px', background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: '8px' }}>
       <span style={{ fontSize: '12px', color: 'var(--gray-600)', width: '100%' }}>Alla {workingPersonnel.length} vakter</span>
-      <input type="time" value={start} onChange={e => setStart(e.target.value)} onKeyDown={onKey} autoFocus style={inp} aria-label="Starttid alla" />
+      <TimeInput value={start} onChange={e => setStart(e.target.value)} onKeyDown={onKey} autoFocus style={inp} aria-label="Starttid alla" />
       <span style={{ color: 'var(--gray-400)' }}>–</span>
-      <input type="time" value={end} onChange={e => setEnd(e.target.value)} onKeyDown={onKey} style={inp} aria-label="Sluttid alla" />
+      <TimeInput value={end} onChange={e => setEnd(e.target.value)} onKeyDown={onKey} style={inp} aria-label="Sluttid alla" />
       <button onClick={save} disabled={busy || !start || !end || start === end}
         style={{ border: 'none', background: '#16a34a', color: 'white', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '13px' }}>Spara alla</button>
       <button onClick={(e) => { stop(e); setEditing(false) }}
@@ -432,7 +433,7 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
             <div>
               <div style={{ fontSize: '11px', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
                 {new Date(match.date).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
-                {' • '}{match.end_time || match.time}{match.time && match.end_time ? ` • Vaktstart ${match.time}` : ''}
+                {' • '}{match.time}{match.time && match.time !== 'TBA' ? ` • Vaktstart ${calculateWorkTimes(match.time).startTime}` : ''}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '20px', fontWeight: '700', color: 'var(--gray-900)' }}>{match.opponent}</span>
@@ -669,7 +670,7 @@ function MatchCard({ match, allPersonnel, isWorking, getWorkHoursForMatch, hasDe
       </div>
 
       <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '10px' }}>
-        {match.end_time || match.time}{match.time && match.end_time ? ` • Vaktstart ${match.time}` : ''}{match.category ? ` • ${match.category}` : ''}
+        {match.time}{match.time && match.time !== 'TBA' ? ` • Vaktstart ${calculateWorkTimes(match.time).startTime}` : ''}{match.category ? ` • ${match.category}` : ''}
       </div>
 
       {/* Avatarer */}

@@ -193,6 +193,7 @@ export default function App() {
           exportWorkHours={data.exportWorkHours}
           updatePersonnelRole={data.updatePersonnelRole}
           updatePersonnelCommute={data.updatePersonnelCommute}
+          updatePersonnelRegular={data.updatePersonnelRegular}
           saving={data.saving}
         />
       )}

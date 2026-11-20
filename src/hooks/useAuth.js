@@ -30,7 +30,7 @@ export function useAuth() {
       .select('*, personnel(id, name)')
       .eq('id', userId)
       .single()
-    console.log('fetchProfile result:', { data, error, userId })
+    if (error) console.error('Kunde inte hämta profil:', error.message)
     setProfile(data)
     setLoading(false)
   }

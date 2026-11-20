@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { REGULAR_GUARDS, HOURLY_RATE, MILEAGE_RATE } from '../constants'
+import { isRegularGuard, HOURLY_RATE, MILEAGE_RATE } from '../constants'
 import { calculateWorkTimes } from '../utils/timeUtils'
 
 function timeToMinutes(t) {
@@ -98,8 +98,8 @@ export function useAppData() {
         .order('date', { ascending: false })
 
       const sortedPersonnel = personnelData?.sort((a, b) => {
-        const aIsRegular = REGULAR_GUARDS.includes(a.name)
-        const bIsRegular = REGULAR_GUARDS.includes(b.name)
+        const aIsRegular = isRegularGuard(a)
+        const bIsRegular = isRegularGuard(b)
         if (aIsRegular && !bIsRegular) return -1
         if (!aIsRegular && bIsRegular) return 1
         return a.name.localeCompare(b.name)
@@ -603,6 +603,17 @@ export function useAppData() {
     } catch (error) { showToast('Fel vid uppdatering av roll', 'error') }
   }
 
+  const updatePersonnelRegular = async (personnelId, isRegular) => {
+    const { error } = await supabase
+      .from('personnel')
+      .update({ is_regular: isRegular })
+      .eq('id', personnelId)
+    if (error) { showToast('Kunde inte spara (har kolumnen is_regular skapats?)', 'error'); return false }
+    showToast(isRegular ? 'Markerad som ordinarie vakt' : 'Markerad som extra vakt', 'success')
+    fetchData()
+    return true
+  }
+
   const updatePersonnelCommute = async (personnelId, miles, getsMileage) => {
     const { error } = await supabase
       .from('personnel')
@@ -659,8 +670,8 @@ export function useAppData() {
 
   // ─── Derived data ─────────────────────────────────────────────────────────
 
-  const regularPersonnel = personnel.filter(p => REGULAR_GUARDS.includes(p.name))
-  const extraPersonnel = personnel.filter(p => !REGULAR_GUARDS.includes(p.name))
+  const regularPersonnel = personnel.filter(p => isRegularGuard(p))
+  const extraPersonnel = personnel.filter(p => !isRegularGuard(p))
 
   const personnelStatsData = personnel.map(person => {
     const personMatches = workHours.filter(wh => wh.personnel_id === person.id)
@@ -731,7 +742,7 @@ export function useAppData() {
     openAddSecurityDutyModal, openEditSecurityDutyModal,
     updateMatchSecurityResponsible, updateMatchDeputySecurityResponsible,
     addDelegate, deleteDelegate,
-    updatePersonnelRole, updatePersonnelCommute,
+    updatePersonnelRole, updatePersonnelCommute, updatePersonnelRegular,
     exportWorkHours,
     regularPersonnel, extraPersonnel, personnelStatsData,
     totalMatchesWorked, totalSecurityDuties,

@@ -1,4 +1,5 @@
 import { useModalBackButton } from '../../hooks/useModalBackButton'
+import TimeInput from '../TimeInput'
 import { useState } from 'react'
 
 function timeToMinutes(t) {
@@ -103,8 +104,7 @@ export default function AddMatchModal({ isOpen, onClose, onSave, availableCatego
           {/* Matchens starttid */}
           <div className="form-group">
             <label>Matchens starttid</label>
-            <input
-              type="time"
+            <TimeInput
               value={time}
               onChange={e => setTime(e.target.value)}
               className="form-input"

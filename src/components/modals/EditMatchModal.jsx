@@ -1,4 +1,5 @@
 import { useModalBackButton } from '../../hooks/useModalBackButton'
+import TimeInput from '../TimeInput'
 import { useState, useEffect } from 'react'
 
 function timeToMinutes(t) {
@@ -67,13 +68,11 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
     }
     const finalCategory = category === '__new__' ? customCategory.trim() : category
     const finalSeason = season === '__new__' ? customSeason.trim() : season
-    const guardStart = matchTime ? minutesToTime(timeToMinutes(matchTime) - 120) : null
-
     setSaving(true)
     await onSave(match.id, {
       date,
-      time: guardStart,
-      end_time: matchTime || null,
+      time: matchTime || null, // matchstart – vaktstart räknas fram (2 h före)
+      end_time: null,
       opponent: opponent.trim(),
       match_type: matchType,
       distance_miles: matchType === 'away' && distanceMiles ? parseFloat(distanceMiles) : null,
@@ -121,7 +120,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
             </div>
             <div style={field}>
               <label style={lbl}>Matchstart{matchTime ? ` (vakt ${minutesToTime(timeToMinutes(matchTime) - 120)})` : ''}</label>
-              <input type="time" value={matchTime} onChange={e => setMatchTime(e.target.value)} className="form-input" style={ctl} />
+              <TimeInput value={matchTime} onChange={e => setMatchTime(e.target.value)} className="form-input" style={ctl} />
             </div>
           </div>
 

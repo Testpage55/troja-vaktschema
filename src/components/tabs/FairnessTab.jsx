@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { REGULAR_GUARDS } from '../../constants'
+import { isRegularGuard } from '../../constants'
 
 // Sammanställning av hur många pass varje vakt jobbat och hur stor andel av
 // matcherna det motsvarar – underlag för en rättvis fördelning.
@@ -61,7 +61,7 @@ export default function FairnessTab({ matches, personnel, workHours, securityDut
       return {
         id: p.id,
         name: p.name,
-        isRegular: REGULAR_GUARDS.includes(p.name),
+        isRegular: isRegularGuard(p),
         shifts: shifts.length,
         home,
         away,
@@ -103,7 +103,7 @@ export default function FairnessTab({ matches, personnel, workHours, securityDut
       })
       items.sort((a, b) => a.date.localeCompare(b.date))
       return {
-        id: p.id, name: p.name, isRegular: REGULAR_GUARDS.includes(p.name),
+        id: p.id, name: p.name, isRegular: isRegularGuard(p),
         lead: items.filter(i => i.role === 'lead').length,
         deputy: items.filter(i => i.role === 'deputy').length,
         items: items.map(i => ({ ...i, dateLabel: fmt(i.date), upcoming: i.date >= today })),

@@ -1219,3 +1219,91 @@ html {
     font-size: 22px;
   }
 }
+/* ── Nedräkning (nästa pass) ───────────────────────────────────── */
+.cd-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 4px 0 16px;
+}
+.cd-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.cd-group { display: flex; align-items: flex-start; }
+.cd-unit { display: flex; flex-direction: column; align-items: center; }
+.cd-tile {
+  position: relative;
+  min-width: 64px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  text-align: center;
+  box-shadow: 0 6px 16px -6px rgba(80, 0, 0, 0.45), inset 0 -3px 0 rgba(185, 28, 28, 0.12);
+}
+.cd-tile::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 1px;
+  background: rgba(185, 28, 28, 0.12);
+}
+.cd-lbl {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+.cd-sep {
+  padding: 0 6px;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 56px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.cd-caption {
+  margin-top: 10px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+.cd-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 22px;
+  font-weight: 800;
+}
+.cd-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #dc2626;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cd-dot { animation: pulse 1.4s ease-in-out infinite; }
+}
+@media (max-width: 360px) {
+  .cd-tile { min-width: 54px; font-size: 30px; }
+  .cd-sep { line-height: 50px; padding: 0 4px; }
+}
+
+/* ── Iseffekt i bannern (PixiJS-canvas ligger bakom innehållet) ── */
+.next-match-banner {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.next-match-banner > :not(canvas) {
+  position: relative;
+  z-index: 1;
+}

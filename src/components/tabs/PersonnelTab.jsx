@@ -15,7 +15,7 @@ function getInitials(name) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function PersonDetailModal({ person, workHours, securityDuties, onClose, onExport, onDelete, onUpdateCommute, isRegular, saving, initialSeason = 'all' }) {
+function PersonDetailModal({ person, workHours, securityDuties, onClose, onExport, onDelete, onUpdateCommute, onToggleRegular, isRegular, saving, initialSeason = 'all' }) {
   const [commuteInput, setCommuteInput] = useState(person.commute_miles != null ? String(person.commute_miles).replace('.', ',') : '')
   const [commuteSaved, setCommuteSaved] = useState(person.commute_miles ?? null)
   const [getsMileage, setGetsMileage] = useState(!!person.gets_mileage)
@@ -116,6 +116,20 @@ function PersonDetailModal({ person, workHours, securityDuties, onClose, onExpor
             <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--gray-900)', lineHeight: 1.2 }}>{person.name}</div>
             <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{isRegular ? 'Ordinarie vakt' : 'Extra vakt'}</div>
           </div>
+          {onToggleRegular && (
+            <button
+              onClick={() => onToggleRegular(person.id, !isRegular)}
+              disabled={saving}
+              title={isRegular ? 'Gör till extra vakt' : 'Gör till ordinarie vakt'}
+              style={{
+                fontSize: '12px', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600',
+                border: `1px solid ${isRegular ? 'var(--gray-300)' : '#16a34a'}`,
+                background: 'white', color: isRegular ? 'var(--gray-600)' : '#15803d'
+              }}
+            >
+              {isRegular ? 'Gör till extra' : 'Gör till ordinarie'}
+            </button>
+          )}
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: 'var(--gray-500)' }}>×</button>
         </div>
 
@@ -343,7 +357,7 @@ export default function PersonnelTab({
   availableSeasons,
   getTotalHoursForPerson, getSecurityHoursForPerson, getTotalAllHoursForPerson,
   addPersonnel, deletePersonnel, exportWorkHours,
-  updatePersonnelRole, updatePersonnelCommute,
+  updatePersonnelRole, updatePersonnelCommute, updatePersonnelRegular,
   saving
 }) {
   const [selectedPerson, setSelectedPerson] = useState(null)
@@ -496,6 +510,10 @@ export default function PersonnelTab({
           onExport={exportWorkHours}
           onDelete={(id, name) => { deletePersonnel(id, name); setSelectedPerson(null) }}
           onUpdateCommute={updatePersonnelCommute}
+          onToggleRegular={async (id, val) => {
+            const ok = await updatePersonnelRegular(id, val)
+            if (ok) setSelectedPerson(null)
+          }}
           saving={saving}
         />
       )}

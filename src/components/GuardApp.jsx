@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import TimeInput from './TimeInput'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import '../guard.css'
+import { downloadIcs } from '../utils/icalExport'
+import { mountIceSnow, iceBurst } from '../effects/iceEffects'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -36,14 +39,51 @@ function fmtDate(dateStr, short = false) {
   return date.toLocaleDateString('sv-SE', { weekday:'long', day:'numeric', month:'long' })
 }
 
+// ─── Countdown ───────────────────────────────────────────────────────────────
+
+function Countdown({ cd }) {
+  if (!cd) return null
+  if (cd.live) return (
+    <div className="cd-wrap">
+      <div className="cd-live"><span className="cd-dot" />Passet pågår</div>
+    </div>
+  )
+  const units = cd.d > 0
+    ? [[cd.d, cd.d === 1 ? 'dag' : 'dagar'], [cd.h, 'tim'], [cd.m, 'min']]
+    : [[cd.h, 'tim'], [cd.m, 'min'], [cd.s, 'sek']]
+  return (
+    <div className="cd-wrap" role="timer" aria-label={`${units.map(([v, l]) => `${v} ${l}`).join(' ')} kvar till vaktstart`}>
+      <div className="cd-row">
+        {units.map(([v, l], i) => (
+          <div key={l} className="cd-group">
+            {i > 0 && <span className="cd-sep" aria-hidden="true">:</span>}
+            <div className="cd-unit">
+              <div className="cd-tile">{String(v).padStart(2, '0')}</div>
+              <div className="cd-lbl">{l}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="cd-caption">kvar till vaktstart</div>
+    </div>
+  )
+}
+
 // ─── NextMatch ────────────────────────────────────────────────────────────────
 
 function NextMatch({ personnelId }) {
   const [next, setNext] = useState(null)
-  const [countdown, setCountdown] = useState('')
+  const [countdown, setCountdown] = useState(null)
   const [loading, setLoading] = useState(true)
+  const bannerRef = useRef(null)
 
   useEffect(() => { fetchNext() }, [personnelId])
+
+  // Iskristaller i bannern (PixiJS)
+  useEffect(() => {
+    if (!next || !bannerRef.current) return
+    return mountIceSnow(bannerRef.current)
+  }, [next])
 
   useEffect(() => {
     if (!next) return
@@ -85,14 +125,13 @@ function NextMatch({ personnelId }) {
     const timeStr = wt.length === 5 ? wt + ':00' : wt
     const dt = new Date(`${n.match.date}T${timeStr}`)
     const diff = dt - new Date()
-    if (diff <= 0) { setCountdown('Pågår nu!'); return }
-    const d = Math.floor(diff/86400000)
-    const h = Math.floor((diff%86400000)/3600000)
-    const m = Math.floor((diff%3600000)/60000)
-    const s = Math.floor((diff%60000)/1000)
-    if (d > 0) setCountdown(`${d}d ${h}h ${m}m`)
-    else if (h > 0) setCountdown(`${h}h ${m}m ${s}s`)
-    else setCountdown(`${m}m ${s}s`)
+    if (diff <= 0) { setCountdown({ live: true }); return }
+    setCountdown({
+      d: Math.floor(diff/86400000),
+      h: Math.floor((diff%86400000)/3600000),
+      m: Math.floor((diff%3600000)/60000),
+      s: Math.floor((diff%60000)/1000),
+    })
   }
 
   if (loading) return null
@@ -110,16 +149,15 @@ function NextMatch({ personnelId }) {
   return (
     <div className="guard-card">
       <h2 className="guard-card-title">Kommande arbetspass</h2>
-      <div className="next-match-banner">
+      <div
+        className="next-match-banner"
+        ref={bannerRef}
+        onClick={e => iceBurst(e.clientX, e.clientY, { pucks: 1 })}
+      >
         <div className="next-match-title">
           IF Troja-Ljungby – {next.match.opponent}
         </div>
-        <div className="next-match-countdown-box">
-          <div className="next-match-countdown">{countdown}</div>
-          <div className="next-match-countdown-label">
-            kvar till {next.workHours ? 'arbetsstart' : 'matchstart'}
-          </div>
-        </div>
+        <Countdown cd={countdown} />
         <div className="next-match-meta">
           <span>{fmtDate(next.match.date)}</span>
           <span>·</span>
@@ -414,7 +452,7 @@ function TimeModal({ assignment, personnelId, onClose, onSave }) {
               <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'8px' }}>{label}</div>
               <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                 <button style={adjBtn} onClick={()=>adjustTime(which,-15)}>−</button>
-                <input type="time" value={val} onChange={e=>setter(e.target.value)}
+                <TimeInput value={val} onChange={e=>setter(e.target.value)}
                   style={{ flex:1, height:'52px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'22px', fontWeight:'800', textAlign:'center', outline:'none', color:'#111827', background:'white', fontVariantNumeric:'tabular-nums' }} />
                 <button style={adjBtn} onClick={()=>adjustTime(which,15)}>+</button>
               </div>
@@ -459,7 +497,7 @@ function TimeModal({ assignment, personnelId, onClose, onSave }) {
 
 // ─── ScheduleModal ───────────────────────────────────────────────────────────
 
-function ScheduleModal({ assignments, onClose }) {
+function ScheduleModal({ assignments, onClose, personnelId, personnelName }) {
   const today = new Date(); today.setHours(0,0,0,0)
   const upcoming = assignments
     .filter(a => {
@@ -481,6 +519,22 @@ function ScheduleModal({ assignments, onClose }) {
           </div>
           <button className="mob-modal-close" onClick={onClose}>×</button>
         </div>
+        {upcoming.length > 0 && (
+          <div style={{ padding:'12px 16px 0' }}>
+            <button
+              onClick={() => downloadIcs(
+                upcoming.map(a => ({ match: a.matches, workHours: a.workHours, personnelId })),
+                `troja-vaktschema-${(personnelName || 'mina-pass').toLowerCase().replace(/\s+/g, '-')}.ics`,
+                'Troja vaktpass'
+              )}
+              style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'1px solid #e5e7eb', background:'#f8fafc', color:'#111827', fontWeight:'700', fontSize:'14px', cursor:'pointer', touchAction:'manipulation' }}>
+              📅 Lägg till i kalendern
+            </button>
+            <div style={{ fontSize:'11px', color:'#9ca3af', textAlign:'center', marginTop:'6px' }}>
+              Laddar ner en kalenderfil med dina {upcoming.length} kommande pass. Öppna den för att lägga in passen.
+            </div>
+          </div>
+        )}
         <div style={{ overflowY:'auto', flex:1, padding:'12px 16px 32px' }}>
           {upcoming.length === 0 ? (
             <div style={{ textAlign:'center', padding:'32px', color:'#9ca3af', fontSize:'14px' }}>Inga kommande pass</div>
@@ -670,7 +724,7 @@ function AssignedMatches({ assignments, onEditTimes, personnelId, isAdmin }) {
           {shown.map(a => {
             const match = a.matches
             const wh = a.workHours
-            const guardStart = match.time ? minutesToTime(timeToMinutes(match.time)-120) : null
+            const guardStart = wh?.start_time ? fmtTime(wh.start_time) : (match.time ? minutesToTime(timeToMinutes(match.time)-120) : null)
 
             return (
               <div key={a.id} style={{ border:'1px solid #e5e7eb', borderRadius:'16px', padding:'16px', background:'white' }}>
@@ -787,13 +841,13 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmi
         <MyHours personnelId={personnelId} />
       </div>
 
-      {showSchedule && <ScheduleModal assignments={assignments} onClose={() => setShowSchedule(false)} />}
+      {showSchedule && <ScheduleModal assignments={assignments} personnelId={personnelId} personnelName={personnelName} onClose={() => setShowSchedule(false)} />}
       {editingAssignment && (
         <TimeModal
           assignment={editingAssignment}
           personnelId={personnelId}
           onClose={()=>setEditingAssignment(null)}
-          onSave={()=>{ setEditingAssignment(null); fetchAssignments() }}
+          onSave={()=>{ setEditingAssignment(null); fetchAssignments(); iceBurst(window.innerWidth / 2, window.innerHeight * 0.65) }}
         />
       )}
 

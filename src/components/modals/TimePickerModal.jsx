@@ -1,4 +1,5 @@
 import { useModalBackButton } from '../../hooks/useModalBackButton'
+import TimeInput from '../TimeInput'
 import { useState, useEffect } from 'react'
 
 function timeToMinutes(t) {
@@ -143,8 +144,7 @@ export default function TimePickerModal({ isOpen, onClose, onSave, personName, m
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '10px', alignItems: 'end', marginBottom: '16px' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500', fontSize: '14px', color: '#374151' }}>Starttid</label>
-              <input
-                type="time"
+              <TimeInput
                 value={startTime}
                 onChange={e => handleStartChange(e.target.value)}
                 style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '16px', textAlign: 'center', boxSizing: 'border-box' }}
@@ -156,8 +156,7 @@ export default function TimePickerModal({ isOpen, onClose, onSave, personName, m
                 Sluttid
                 {crossesMidnight && <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '6px' }}>+1 dag</span>}
               </label>
-              <input
-                type="time"
+              <TimeInput
                 value={endTime}
                 onChange={e => handleEndChange(e.target.value)}
                 style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '16px', textAlign: 'center', boxSizing: 'border-box' }}
