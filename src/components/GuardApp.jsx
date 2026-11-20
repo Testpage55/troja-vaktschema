@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import '../guard.css'
 import { downloadIcs } from '../utils/icalExport'
-import { mountIceSnow, iceBurst } from '../effects/iceEffects'
+import { mountIceSnow, iceBurst, effectsEnabled, setEffectsEnabled, EFFECTS_EVENT } from '../effects/iceEffects'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -80,10 +80,16 @@ function NextMatch({ personnelId }) {
   useEffect(() => { fetchNext() }, [personnelId])
 
   // Iskristaller i bannern (PixiJS)
+  const [fxOn, setFxOn] = useState(effectsEnabled())
   useEffect(() => {
-    if (!next || !bannerRef.current) return
+    const h = (e) => setFxOn(e.detail)
+    window.addEventListener(EFFECTS_EVENT, h)
+    return () => window.removeEventListener(EFFECTS_EVENT, h)
+  }, [])
+  useEffect(() => {
+    if (!next || !fxOn || !bannerRef.current) return
     return mountIceSnow(bannerRef.current)
-  }, [next])
+  }, [next, fxOn])
 
   useEffect(() => {
     if (!next) return
@@ -705,60 +711,60 @@ function AssignedMatches({ assignments, onEditTimes, personnelId, isAdmin }) {
   return (
     <div className="guard-card">
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', gap:'12px' }}>
-        <h2 className="guard-card-title" style={{ margin:0 }}>Kommande Matcher</h2>
+        <h2 className="guard-card-title" style={{ margin:0 }}>Kommande matcher</h2>
         {filtered.length > 3 && (
-          <button onClick={()=>setShowAll(v=>!v)}
-            style={{ background:'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)', color:'white', padding:'6px 14px', borderRadius:'12px', fontSize:'13px', fontWeight:'600', border:'none', cursor:'pointer', flexShrink:0, touchAction:'manipulation' }}>
-            {showAll ? 'Visa färre' : `${filtered.length} matcher`}
+          <button onClick={()=>setShowAll(v=>!v)} className="tl-toggle">
+            {showAll ? 'Visa färre' : `Visa alla ${filtered.length}`}
           </button>
         )}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign:'center', padding:'40px', color:'#6b7280', background:'#f8fafc', borderRadius:'16px', border:'2px dashed #cbd5e0' }}>
-          <div style={{ fontWeight:'600', color:'#374151', marginBottom:'8px' }}>Inga kommande matcher</div>
-          <p style={{ margin:0, fontSize:'14px' }}>Du har inga tilldelade matcher framöver.</p>
+        <div className="tl-empty">
+          <strong>Inga kommande matcher</strong>
+          När du schemaläggs på en match dyker den upp här.
         </div>
       ) : (
-        <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
-          {shown.map(a => {
+        <ol className="tl">
+          {shown.map((a, idx) => {
             const match = a.matches
             const wh = a.workHours
-            const guardStart = wh?.start_time ? fmtTime(wh.start_time) : (match.time ? minutesToTime(timeToMinutes(match.time)-120) : null)
+            const d0 = new Date(match.date); d0.setHours(0,0,0,0)
+            const days = Math.round((d0 - today) / 86400000)
+            const isToday = days === 0
+            const isNext = idx === 0
+            const guardStart = match.time ? minutesToTime(timeToMinutes(match.time)-120) : null
+            const dateLabel = d0.toLocaleDateString('sv-SE', { weekday:'short', day:'numeric', month:'short' }).replace(/\./g, '')
+            const rel = isToday ? 'Idag' : days === 1 ? 'Imorgon' : days < 7 ? `om ${days} dagar` : days < 14 ? 'om 1 vecka' : `om ${Math.floor(days / 7)} veckor`
 
             return (
-              <div key={a.id} style={{ border:'1px solid #e5e7eb', borderRadius:'16px', padding:'16px', background:'white' }}>
-                {/* Match title row */}
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px', marginBottom:'6px' }}>
-                  <h3 onClick={()=>setSelectedMatch(match)}
-                    style={{ margin:0, fontSize:'16px', fontWeight:'700', color:'#ef4444', cursor:'pointer', flex:1, minWidth:0 }}>
-                    IF Troja – {match.opponent} 👥
-                  </h3>
-                  <button onClick={()=>onEditTimes(a)} className="btn btn-primary btn-small" style={{ flexShrink:0, touchAction:'manipulation' }}>
-                    {wh?'Ändra':'Sätt tider'}
+              <li key={a.id} className={`tl-item${isToday ? ' is-today' : ''}${isNext ? ' is-next' : ''}`}>
+                <span className="tl-dot" aria-hidden="true" />
+                <div className="tl-date">
+                  {isToday ? `Idag, ${dateLabel}` : `${dateLabel}, ${rel}`}
+                </div>
+                <div className="tl-row">
+                  <button className="tl-title" onClick={() => setSelectedMatch(match)} title="Visa vilka som jobbar">
+                    {match.opponent}
+                    {match.match_type === 'away' && <span className="tl-away">Borta</span>}
+                  </button>
+                  <button className={`tl-edit${wh ? '' : ' is-needed'}`} onClick={() => onEditTimes(a)}>
+                    {wh ? 'Ändra' : 'Sätt tider'}
                   </button>
                 </div>
-                {/* Meta */}
-                <div style={{ color:'#6b7280', fontSize:'12px', marginBottom:'10px' }}>
-                  {fmtDate(match.date)} · {match.match_type==='away'?'Borta':'Hemma'}
-                  {match.time && ` · Match ${match.time}`}
-                  {guardStart && ` · Vaktstart ${guardStart}`}
+                <div className="tl-chips">
+                  {wh ? (
+                    <span className="tl-chip is-ok">Vakt {fmtTime(wh.start_time)}–{fmtTime(wh.end_time)}</span>
+                  ) : (
+                    <span className="tl-chip is-warn">Tider saknas{guardStart ? `, start ca ${guardStart}` : ''}</span>
+                  )}
+                  {match.time && <span className="tl-chip">Match {match.time}</span>}
+                  {match.attendance && <span className="tl-chip">{match.attendance.toLocaleString('sv-SE')} åskådare</span>}
                 </div>
-                {/* Status */}
-                {wh ? (
-                  <div style={{ background:'#d1fae5', border:'1px solid #10b981', padding:'8px 12px', borderRadius:'8px', fontSize:'13px', color:'#065f46', fontWeight:'500', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'6px' }}>
-                    <span>✓ {fmtTime(wh.start_time)} – {fmtTime(wh.end_time)} ({calcHours(wh.start_time,wh.end_time)}h)</span>
-                    {match.attendance && <span style={{ color:'#374151', fontWeight:'600' }}>👥 {match.attendance.toLocaleString('sv-SE')}</span>}
-                  </div>
-                ) : (
-                  <div style={{ background:'#fef3c7', border:'1px solid #f59e0b', padding:'6px 12px', borderRadius:'8px', fontSize:'12px', color:'#92400e', fontWeight:'500' }}>
-                    ⚠ Tider inte registrerade
-                  </div>
-                )}
-              </div>
+              </li>
             )
           })}
-        </div>
+        </ol>
       )}
 
       {selectedMatch && <MatchPersonnelModal match={selectedMatch} onClose={()=>setSelectedMatch(null)} personnelId={personnelId} isAdmin={isAdmin} />}
@@ -773,6 +779,13 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmi
   const [loading, setLoading] = useState(true)
   const [editingAssignment, setEditingAssignment] = useState(null)
   const [showSchedule, setShowSchedule] = useState(false)
+  const [fxOn, setFxOn] = useState(effectsEnabled())
+  const toggleFx = () => {
+    const on = !fxOn
+    setFxOn(on)
+    setEffectsEnabled(on)
+    if (on) iceBurst(window.innerWidth / 2, 120, { pucks: 1 })
+  }
 
   useEffect(() => { if (personnelId) fetchAssignments() }, [personnelId])
 
@@ -829,6 +842,11 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmi
                 <span>Admin</span>
               </button>
             )}
+            <button onClick={toggleFx} className="guard-schedule-btn" title={fxOn ? 'Stäng av iseffekter' : 'Slå på iseffekter'} aria-pressed={fxOn}
+              style={fxOn ? undefined : { opacity: 0.6 }}>
+              <span style={{ fontSize:'18px' }}>{fxOn ? '❄️' : '🚫'}</span>
+              <span>Effekter {fxOn ? 'på' : 'av'}</span>
+            </button>
             <button className="logout-btn" onClick={onSignOut}>Logga ut</button>
           </div>
         )}

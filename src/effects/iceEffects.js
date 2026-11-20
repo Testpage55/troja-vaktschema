@@ -3,11 +3,22 @@
 // 2. iceBurst(x, y):   isspray + pucks som sprutar ut, som när en skridsko
 //                      tvärbromsar. Används när en vakt sparar sina tider.
 // PixiJS laddas först när en effekt behövs, så adminvyn påverkas inte.
-// Med "minska rörelse" påslaget (t.ex. Windows animationseffekter av) körs
-// en lugnare variant: långsammare snö och mindre spray.
+// Effekterna slås av/på med en knapp i vaktvyn (sparas i webbläsaren).
+// Standard är på, oavsett systemets "minska rörelse".
 
-const reducedMotion = () =>
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+const STORAGE_KEY = 'troja_effects'
+export const EFFECTS_EVENT = 'troja-effects-change'
+
+export function effectsEnabled() {
+  try { return localStorage.getItem(STORAGE_KEY) !== 'off' } catch (e) { return true }
+}
+
+export function setEffectsEnabled(on) {
+  try { localStorage.setItem(STORAGE_KEY, on ? 'on' : 'off') } catch (e) { /* ignoreras */ }
+  window.dispatchEvent(new CustomEvent(EFFECTS_EVENT, { detail: on }))
+}
+
+const reducedMotion = () => false
 
 let pixiPromise = null
 const loadPixi = () => (pixiPromise ||= import('pixi.js'))
@@ -53,7 +64,7 @@ function puckTexture(PIXI, renderer) {
 
 export function mountIceSnow(el, { count: countOpt = 34 } = {}) {
   let count = countOpt
-  if (!el) return () => {}
+  if (!el || !effectsEnabled()) return () => {}
   const calm = reducedMotion()
   if (calm) count = Math.round(count * 0.6)
   let destroyed = false
@@ -152,6 +163,7 @@ async function getBurstApp() {
 }
 
 export async function iceBurst(x, y, { pucks = 3 } = {}) {
+  if (!effectsEnabled()) return
   const calm = reducedMotion()
   if (calm) pucks = Math.min(pucks, 1)
   const { PIXI, app } = await getBurstApp()
