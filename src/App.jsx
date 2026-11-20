@@ -164,6 +164,7 @@ export default function App() {
           updateMatch={data.updateMatch}
           deleteMatch={data.deleteMatch}
           onAddMatch={() => data.setIsAddMatchModalOpen(true)}
+          onApplicationsChanged={data.refreshData}
           delegates={data.delegates}
           onAddDelegate={data.addDelegate}
           onDeleteDelegate={data.deleteDelegate}
@@ -191,6 +192,7 @@ export default function App() {
           addPersonnel={data.addPersonnel}
           deletePersonnel={data.deletePersonnel}
           exportWorkHours={data.exportWorkHours}
+          refreshData={data.refreshData}
           updatePersonnelRole={data.updatePersonnelRole}
           updatePersonnelCommute={data.updatePersonnelCommute}
           updatePersonnelRegular={data.updatePersonnelRegular}

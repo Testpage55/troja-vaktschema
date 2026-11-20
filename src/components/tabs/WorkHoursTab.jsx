@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import TimeInput from '../TimeInput'
 import { HOURLY_RATE, MEAL_DEDUCTION_HOURS, MILEAGE_RATE } from '../../constants'
-import { calcPayroll } from '../../utils/timeUtils'
+import { calcPayroll, auditLabel, AUDIT_COLORS } from '../../utils/timeUtils'
 
 // Löneberäkning per rad: sluttid uppåt till halvtimme, sedan matavdrag.
 // Säkerhetsuppdrag saknar klockslag – där dras bara matavdraget (0 h stannar på 0 h).
@@ -123,6 +124,7 @@ async function exportToExcel(entries, fromDate, toDate, personById, personByName
         net: Math.round(m.net * 100) / 100,
         away: awayCompensation(e),
         notes: e.notes || '',
+        audit: e.type === 'work' ? [auditLabel(e)?.text, auditLabel(e)?.detail].filter(Boolean).join(', ') : '',
       }
     })
     .sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.name.localeCompare(b.name, 'sv-SE'))
@@ -245,12 +247,164 @@ function PayoutsPanel({ fromDate, toDate }) {
   )
 }
 
-export default function WorkHoursTab({ matches = [], personnel = [], workHours, securityDuties, allWorkEntries, saving, seasonFilter: seasonFilterProp, setSeasonFilter: setSeasonFilterProp, availableSeasons: availableSeasonsProp }) {
+// ─── Ändringslogg ─────────────────────────────────────────────────────────────
+// Visar varje registrering och ändring av arbetstider (skrivs av databasen).
+
+function ChangeLogPanel({ fromDate, toDate }) {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [onlyGuards, setOnlyGuards] = useState(true)
+
+  useEffect(() => {
+    if (!open) return
+    setLoading(true)
+    let q = supabase.from('work_hours_log')
+      .select('*')
+      .order('changed_at', { ascending: false })
+      .limit(200)
+    if (fromDate) q = q.gte('work_date', fromDate)
+    if (toDate) q = q.lte('work_date', toDate)
+    q.then(({ data }) => { setRows(data || []); setLoading(false) })
+  }, [open, fromDate, toDate])
+
+  const hm = (t) => (t ? String(t).slice(0, 5) : '–')
+  const stamp = (ts) => new Date(ts).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  const shown = rows.filter(r => r.action !== 'insert' || r.changed_by_role !== 'admin')
+    .filter(r => !onlyGuards || r.changed_by_role !== 'admin')
+  const actionText = (r) => r.action === 'insert'
+    ? `registrerade ${hm(r.new_start)}–${hm(r.new_end)}`
+    : r.action === 'delete'
+      ? `tog bort ${hm(r.old_start)}–${hm(r.old_end)}`
+      : (r.old_start !== r.new_start || r.old_end !== r.new_end)
+        ? `ändrade ${hm(r.old_start)}–${hm(r.old_end)} → ${hm(r.new_start)}–${hm(r.new_end)}`
+        : 'ändrade anteckningen'
+
+  return (
+    <div style={{ background: 'white', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px', boxShadow: 'var(--shadow-sm)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '15px' }}>Ändringslogg för arbetstider</div>
+          <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Vem som registrerat eller ändrat tider, och när. Följer datumfiltret ovan.</div>
+        </div>
+        <button className="btn btn-secondary" onClick={() => setOpen(o => !o)}>{open ? 'Dölj' : 'Visa logg'}</button>
+      </div>
+      {open && (
+        <div style={{ marginTop: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', marginBottom: '8px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={onlyGuards} onChange={e => setOnlyGuards(e.target.checked)} />
+            Bara ändringar gjorda av vakter
+          </label>
+          {loading ? <div style={{ fontSize: '13px', color: 'var(--gray-500)' }}>Hämtar…</div>
+            : shown.length === 0 ? <div style={{ fontSize: '13px', color: 'var(--gray-500)' }}>Inga ändringar i perioden.</div>
+            : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '360px', overflowY: 'auto' }}>
+                {shown.map(r => (
+                  <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px', fontSize: '13px', padding: '6px 8px', borderRadius: '6px', background: r.action === 'update' ? '#fffbeb' : 'var(--gray-50)' }}>
+                    <span style={{ color: 'var(--gray-500)' }}>{stamp(r.changed_at)}</span>
+                    <span>
+                      <strong>{r.changed_by_name}{r.changed_by_role === 'admin' ? ' (admin)' : ''}</strong> {actionText(r)}
+                      <span style={{ color: 'var(--gray-500)' }}>
+                        {' '}för {r.personnel_name || 'okänd'}, {r.match_opponent || 'uppdrag'} {r.work_date ? new Date(r.work_date + 'T12:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }) : ''}
+                      </span>
+                      {r.old_notes !== r.new_notes && r.action === 'update' && (
+                        <span style={{ display: 'block', color: 'var(--gray-600)' }}>Anteckning: "{r.new_notes || ''}"</span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Rätta ett pass direkt i löneunderlaget ──────────────────────────────────
+
+const hhmm = (t) => (t ? String(t).slice(0, 5) : '')
+
+function EditEntryModal({ entry, onClose, onSaved }) {
+  const [start, setStart] = useState(hhmm(entry.start_time))
+  const [end, setEnd] = useState(hhmm(entry.end_time))
+  const [notes, setNotes] = useState(entry.notes || '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const audit = auditLabel(entry)
+  const hasOriginal = entry.original_start_time && entry.original_end_time
+  const isOriginal = hasOriginal && start === hhmm(entry.original_start_time) && end === hhmm(entry.original_end_time)
+
+  const save = async (s = start, e = end) => {
+    if (!s || !e) { setError('Ange både start- och sluttid.'); return }
+    setBusy(true); setError('')
+    const { data, error } = await supabase.from('work_hours')
+      .update({ start_time: s, end_time: e, notes: notes.trim() || null })
+      .eq('id', entry.id)
+      .select('*')
+      .single()
+    setBusy(false)
+    if (error) { setError('Kunde inte spara: ' + error.message); return }
+    onSaved(data)
+  }
+
+  const date = entry.work_date || entry.matches?.date
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+      <div onClick={ev => ev.stopPropagation()} style={{ background: 'white', borderRadius: '14px', padding: '20px', width: '100%', maxWidth: '420px', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }}>
+        <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{date ? new Date(date + 'T12:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' }) : ''}</div>
+        <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '2px' }}>{entry.personnel?.name}</div>
+        <div style={{ fontSize: '14px', color: 'var(--gray-600)', marginBottom: '12px' }}>{entry.matches?.opponent}</div>
+
+        {audit && (
+          <div style={{ background: AUDIT_COLORS[audit.tone].bg, color: AUDIT_COLORS[audit.tone].fg, borderRadius: '8px', padding: '8px 10px', fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>
+            {audit.text}{audit.detail && <div style={{ fontWeight: 400 }}>{audit.detail}</div>}
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)' }}>Start
+            <TimeInput value={start} onChange={ev => setStart(ev.target.value)} style={{ width: '100%', height: '42px', marginTop: '4px', padding: '0 10px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '18px', fontWeight: 700, textAlign: 'center' }} />
+          </label>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)' }}>Slut
+            <TimeInput value={end} onChange={ev => setEnd(ev.target.value)} style={{ width: '100%', height: '42px', marginTop: '4px', padding: '0 10px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '18px', fontWeight: 700, textAlign: 'center' }} />
+          </label>
+        </div>
+
+        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gray-600)' }}>Anteckning
+          <textarea value={notes} onChange={ev => setNotes(ev.target.value)} rows={2} style={{ width: '100%', marginTop: '4px', padding: '8px 10px', border: '1px solid var(--gray-200)', borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+        </label>
+
+        {error && <div style={{ color: '#b91c1c', fontSize: '13px', marginTop: '8px' }}>{error}</div>}
+
+        <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
+          {hasOriginal && !isOriginal && (
+            <button className="btn btn-secondary" disabled={busy}
+              onClick={() => { const s = hhmm(entry.original_start_time), e = hhmm(entry.original_end_time); setStart(s); setEnd(e); save(s, e) }}
+              title="Sätt tillbaka tiden som passet hade när det skapades">
+              Återställ till {hhmm(entry.original_start_time)}–{hhmm(entry.original_end_time)}
+            </button>
+          )}
+          <span style={{ flex: 1 }} />
+          <button className="btn btn-secondary" onClick={onClose} disabled={busy}>Avbryt</button>
+          <button className="btn btn-primary" onClick={() => save()} disabled={busy}>{busy ? 'Sparar…' : 'Spara'}</button>
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '10px' }}>Din ändring loggas med ditt namn och tidpunkt.</div>
+      </div>
+    </div>
+  )
+}
+
+export default function WorkHoursTab({ refreshData, matches = [], personnel = [], workHours, securityDuties, allWorkEntries, saving, seasonFilter: seasonFilterProp, setSeasonFilter: setSeasonFilterProp, availableSeasons: availableSeasonsProp }) {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [personnelFilter, setPersonnelFilter] = useState('all')
   const [excluded, setExcluded] = useState([]) // vakter som är avbockade (t.ex. redan fått lön)
   const [typeFilter, setTypeFilter] = useState('all')
+  const [onlyChanged, setOnlyChanged] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [patched, setPatched] = useState({}) // sparade rättningar visas direkt, även innan omladdning
+  const [savedMsg, setSavedMsg] = useState('')
   const [localSeasonFilter, setLocalSeasonFilter] = useState(seasonFilterProp || 'all')
   const seasonFilter = seasonFilterProp !== undefined ? seasonFilterProp : localSeasonFilter
   const setSeasonFilter = setSeasonFilterProp || setLocalSeasonFilter
@@ -258,7 +412,9 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
   // Matcher där matavdraget är avstängt → märk raderna så getPay hoppar över avdraget
   const matchById = Object.fromEntries(matches.map(m => [String(m.id), m]))
   // Säkerhetsansvarig som sätts på en match (auto) ska inte med på lönen – bara manuellt inlagda uppdrag.
-  const payrollEntries = allWorkEntries.filter(e => !(e.type === 'security' && e.auto))
+  const payrollEntries = allWorkEntries
+    .filter(e => !(e.type === 'security' && e.auto))
+    .map(e => (e.type === 'work' && patched[e.id]) ? { ...e, ...patched[e.id] } : e)
   const annotatedEntries = payrollEntries.map(e => {
     const matchId = e.type === 'work' ? e.match_id : (String(e.id).startsWith('auto_') ? String(e.id).slice(5) : null)
     const match = matchId != null ? matchById[String(matchId)] : null
@@ -295,7 +451,9 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
     if (seasonFilter !== 'all' && !seasonUnknown && season !== seasonFilter) return false
     return true
   })
+  const changedInPeriod = inPeriod.filter(e => e.type === 'work' && e.change_status === 'changed').length
   const filtered = inPeriod.filter(e => !excluded.includes(entryName(e) || 'Okänd'))
+  const tableRows = onlyChanged ? filtered.filter(e => e.type === 'work' && e.change_status === 'changed') : filtered
 
   // Vakter som har pass i vald period, med timmar – underlag för kryssrutorna
   const periodPeople = Object.values(inPeriod.reduce((acc, e) => {
@@ -439,6 +597,7 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
       </div>
 
       <PayoutsPanel fromDate={fromDate} toDate={toDate} />
+      <ChangeLogPanel fromDate={fromDate} toDate={toDate} />
 
       <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '12px' }}>
         Löneberäkning: sluttiden rundas upp till närmaste halvtimme, därefter dras matavdrag på {MEAL_DEDUCTION_HOURS * 60} min per pass.
@@ -491,9 +650,37 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
         </div>
       )}
 
+      {editing && (
+        <EditEntryModal entry={editing} onClose={() => setEditing(null)}
+          onSaved={(row) => {
+            if (row) setPatched(p => ({ ...p, [row.id]: row }))
+            setSavedMsg(`Sparat: ${editing.personnel?.name}, ${editing.matches?.opponent} ${hhmm(row?.start_time)}–${hhmm(row?.end_time)}`)
+            setTimeout(() => setSavedMsg(''), 4000)
+            setEditing(null)
+            refreshData?.()
+          }} />
+      )}
+
+      {savedMsg && (
+        <div role="status" style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', background: '#065f46', color: 'white', padding: '10px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: 600, zIndex: 1001, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
+          ✓ {savedMsg}
+        </div>
+      )}
+
       {/* Tabell */}
-      <div className="table-container">
-        <table>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '0 0 8px', flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={onlyChanged} onChange={e => setOnlyChanged(e.target.checked)} />
+          Visa bara pass där vakten eller admin ändrat tiden
+        </label>
+        {changedInPeriod > 0 && (
+          <span style={{ fontSize: '12px', fontWeight: 600, background: '#fef3c7', color: '#92400e', borderRadius: '6px', padding: '2px 8px' }}>
+            {changedInPeriod} ändrade pass i perioden
+          </span>
+        )}
+      </div>
+      <div className="table-container wh-table-wrap">
+        <table className="wh-table">
           <thead>
             <tr>
               <th>Datum</th>
@@ -509,11 +696,12 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
               <th>Bruttolön</th>
               <th>Milersättning</th>
               <th>Brutto − milersättning</th>
+              <th>Registrering</th>
               <th>Anteckningar</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(entry => {
+            {tableRows.map(entry => {
               const date = entry.type === 'work'
                 ? (entry.work_date || entry.matches?.date)
                 : entry.date
@@ -521,8 +709,11 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
               const money = getMoney(entry, personById, personByName)
 
               return (
-                <tr key={`${entry.type}-${entry.id}`}>
-                  <td>{new Date(date).toLocaleDateString('sv-SE')}</td>
+                <tr key={`${entry.type}-${entry.id}`}
+                  className={entry.type === 'work' ? 'wh-row-editable' : undefined}
+                  onClick={entry.type === 'work' ? () => setEditing(entry) : undefined}
+                  title={entry.type === 'work' ? 'Klicka för att rätta passet' : undefined}>
+                  <td className="wh-nowrap">{new Date(date).toLocaleDateString('sv-SE')}</td>
                   <td>{entry.type === 'work' ? entry.matches?.opponent : entry.opponent}</td>
                   <td>{entry.type === 'work' ? entry.personnel?.name : entry.personnel_name}</td>
                   <td>
@@ -530,8 +721,8 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
                       {entry.type === 'work' ? 'Vakt' : 'Säkerhet'}
                     </span>
                   </td>
-                  <td>{entry.type === 'work' ? entry.start_time : '-'}</td>
-                  <td>{entry.type === 'work' ? entry.end_time : '-'}</td>
+                  <td className="wh-nowrap">{entry.type === 'work' ? hhmm(entry.start_time) : '-'}</td>
+                  <td className="wh-nowrap">{entry.type === 'work' ? hhmm(entry.end_time) : '-'}</td>
                   <td>{pay.roundedEnd}</td>
                   <td>{pay.grossHours.toFixed(1)}h</td>
                   <td title={entry.noMealDeduction ? 'Matavdrag avstängt för matchen' : undefined}>{pay.deduction > 0 ? `−${pay.deduction.toFixed(1)}h` : (entry.noMealDeduction ? 'Inget' : '-')}</td>
@@ -539,6 +730,18 @@ export default function WorkHoursTab({ matches = [], personnel = [], workHours, 
                   <td>{money.brutto.toLocaleString('sv-SE')} kr</td>
                   <td>{money.mileage > 0 ? `−${money.mileage.toLocaleString('sv-SE')} kr` : '-'}</td>
                   <td><strong>{money.net.toLocaleString('sv-SE')} kr</strong></td>
+                  <td className="wh-audit">
+                    {entry.type === 'work' && (() => {
+                      const a = auditLabel(entry)
+                      if (!a) return '-'
+                      const c = AUDIT_COLORS[a.tone]
+                      return (
+                        <span className="wh-audit-badge" style={{ background: c.bg, color: c.fg }}>
+                          {a.text}{a.detail && <span className="wh-audit-detail">{a.detail}</span>}
+                        </span>
+                      )
+                    })()}
+                  </td>
                   <td style={{ fontSize: '12px', color: 'var(--gray-500)' }}>{entry.notes || '-'}</td>
                 </tr>
               )

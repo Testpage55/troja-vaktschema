@@ -27,6 +27,7 @@ const DETAIL_COLUMNS = [
   { header: 'Milersättning (kr)', key: 'mileage', width: 18, fmt: '#,##0.00', sum: true },
   { header: 'Brutto minus milersättning (kr)', key: 'net', width: 30, fmt: '#,##0.00', sum: true },
   { header: 'Milersättning säkerhetsuppdrag (kr)', key: 'away', width: 34, fmt: '#,##0.00', sum: true },
+  { header: 'Registrering / ändring', key: 'audit', width: 42 },
   { header: 'Anteckningar', key: 'notes', width: 30 },
 ]
 
@@ -143,6 +144,7 @@ function findIssues(detailRows) {
       if (!r.start || !r.end) issues.push({ ...base, kind: 'Saknar tid', text: 'Start- eller sluttid saknas – timmar bygger på sparat timvärde.' })
       if (r.payHours === 0) issues.push({ ...base, kind: '0 lönetimmar', text: 'Passet ger 0 lönetimmar.' })
       if (r.payHours > 12) issues.push({ ...base, kind: 'Över 12 timmar', text: `Passet ger ${r.payHours} lönetimmar – kontrollera tiderna.` })
+      if (r.audit && r.audit.startsWith('Ändrad av')) issues.push({ ...base, kind: 'Ändrad tid', text: `${r.audit}.` })
     }
   })
   return issues

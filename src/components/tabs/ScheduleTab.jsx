@@ -3,8 +3,9 @@ import TimeInput from '../TimeInput'
 import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { SECURITY_RESPONSIBLE, isRegularGuard } from '../../constants'
 import EditMatchModal from '../modals/EditMatchModal'
+import { PendingApplicationsPanel, MatchApplicationsSection } from '../ApplicationsAdmin'
 import { supabase } from '../../lib/supabase'
-import { calculateWorkTimes } from '../../utils/timeUtils'
+import { calculateWorkTimes, formatResult } from '../../utils/timeUtils'
 
 function PersonRow({ person, match, toggleWorking, saving }) {
   const isSecResp = match.security_responsible_id == person.id
@@ -393,7 +394,7 @@ function AttendanceInline({ match }) {
   )
 }
 
-function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, saveWorkTimeDirect, saveWorkTimeBulk, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, onUpdateDeputySecurityResponsible, currentPersonnelId, onExtrasChanged }) {
+function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWorkHoursForMatch, hasDeviatingHours, toggleWorking, saveWorkTimeDirect, saveWorkTimeBulk, saving, onClose, onEdit, onDelete, delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, onUpdateDeputySecurityResponsible, currentPersonnelId, onExtrasChanged, onApplicationsChanged }) {
   const [search, setSearch] = useState('')
   const matchType = match.match_type || 'home'
   const q = search.toLowerCase()
@@ -438,6 +439,13 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '20px', fontWeight: '700', color: 'var(--gray-900)' }}>{match.opponent}</span>
                 {isClass3(match) && <Class3Badge />}
+                {(() => { const r = formatResult(match); return r && (
+                  <span title={r.label} style={{ fontSize: '13px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px',
+                    background: r.outcome === 'win' ? '#dcfce7' : r.outcome === 'loss' ? '#fee2e2' : '#f3f4f6',
+                    color: r.outcome === 'win' ? '#15803d' : r.outcome === 'loss' ? '#b91c1c' : '#374151' }}>
+                    {r.label} {r.text}
+                  </span>
+                ) })()}
               </div>
               {/* Publikantal */}
               <AttendanceInline match={match} />
@@ -463,6 +471,9 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
         </div>
 
         <div style={{ padding: '12px 20px 0' }}>
+          {/* Ansökningar */}
+          <MatchApplicationsSection matchId={match.id} onChanged={onApplicationsChanged} />
+
           {/* Inget matavdrag */}
           {match.no_meal_deduction && (
             <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a', fontSize: '14px', fontWeight: '600', color: '#92400e' }}>
@@ -737,7 +748,7 @@ export default function ScheduleTab({
   hasDeviatingHours, getDetailedTooltip, calculateMileageForMatch,
   toggleWorking, openTimeModal, saveWorkTimeDirect, saveWorkTimeBulk, updateMatch, deleteMatch, onAddMatch,
   delegates, onAddDelegate, onDeleteDelegate, onUpdateSecurityResponsible, onUpdateDeputySecurityResponsible,
-  saving, currentPersonnelId, matchExtraCounts = {}, onExtrasChanged
+  saving, currentPersonnelId, matchExtraCounts = {}, onExtrasChanged, onApplicationsChanged
 }) {
   const [selectedMatchId, setSelectedMatchId] = useState(null)
   const selectedMatch = matches.find(m => m.id === selectedMatchId) || null
@@ -781,6 +792,15 @@ export default function ScheduleTab({
           </select>
         )}
       </div>
+
+      <PendingApplicationsPanel
+        onChanged={onApplicationsChanged}
+        getWorkingCount={(id) => { const m = matches.find(x => x.id === id); return m ? getWorkingCount(m) : null }}
+        shiftsByPerson={matches.reduce((acc, m) => {
+          (m.assignments || []).filter(a => a.is_working).forEach(a => { const k = `${a.personnel_id}|${m.season}`; acc[k] = (acc[k] || 0) + 1 })
+          return acc
+        }, {})}
+      />
 
       {monthGroups.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--gray-500)' }}>
@@ -853,6 +873,7 @@ export default function ScheduleTab({
           onUpdateDeputySecurityResponsible={onUpdateDeputySecurityResponsible}
           currentPersonnelId={currentPersonnelId}
           onExtrasChanged={onExtrasChanged}
+          onApplicationsChanged={onApplicationsChanged}
         />
       )}
 

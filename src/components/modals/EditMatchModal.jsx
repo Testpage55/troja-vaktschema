@@ -34,6 +34,9 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
   const [attendance, setAttendance] = useState('')
   const [policeContact, setPoliceContact] = useState('')
   const [noMealDeduction, setNoMealDeduction] = useState(false)
+  const [trojaGoals, setTrojaGoals] = useState('')
+  const [opponentGoals, setOpponentGoals] = useState('')
+  const [resultType, setResultType] = useState('')
   const [saving, setSaving] = useState(false)
 
   // time = matchstart i databasen
@@ -55,6 +58,9 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       setAttendance(match.attendance ? String(match.attendance) : '')
       setPoliceContact(match.police_contact || '')
       setNoMealDeduction(!!match.no_meal_deduction)
+      setTrojaGoals(match.troja_goals == null ? '' : String(match.troja_goals))
+      setOpponentGoals(match.opponent_goals == null ? '' : String(match.opponent_goals))
+      setResultType(match.result_type || '')
     }
   }, [match])
 
@@ -82,6 +88,9 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       attendance: attendance ? parseInt(attendance) : null,
       police_contact: policeContact.trim() || null,
       no_meal_deduction: noMealDeduction,
+      troja_goals: trojaGoals === '' ? null : parseInt(trojaGoals),
+      opponent_goals: opponentGoals === '' ? null : parseInt(opponentGoals),
+      result_type: (trojaGoals === '' || opponentGoals === '') ? null : (resultType || null),
     })
     setSaving(false)
     onClose()
@@ -176,6 +185,25 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
             <div style={field}>
               <label style={lbl}>Poliskontakt</label>
               <input type="text" value={policeContact} onChange={e => setPoliceContact(e.target.value)} className="form-input" style={ctl} placeholder="Valfritt" />
+            </div>
+          </div>
+
+          <div style={row}>
+            <div style={field}>
+              <label style={lbl}>Resultat (Troja – {opponent.trim() || 'motståndare'})</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input type="number" min="0" inputMode="numeric" value={trojaGoals} onChange={e => setTrojaGoals(e.target.value)} className="form-input" style={{ ...ctl, width: '70px', textAlign: 'center' }} placeholder="–" aria-label="Trojas mål" />
+                <span style={{ color: 'var(--gray-400)', fontWeight: 700 }}>–</span>
+                <input type="number" min="0" inputMode="numeric" value={opponentGoals} onChange={e => setOpponentGoals(e.target.value)} className="form-input" style={{ ...ctl, width: '70px', textAlign: 'center' }} placeholder="–" aria-label="Motståndarens mål" />
+              </div>
+            </div>
+            <div style={field}>
+              <label style={lbl}>Avgjordes</label>
+              <select value={resultType} onChange={e => setResultType(e.target.value)} className="form-input" style={ctl}>
+                <option value="">Ordinarie tid</option>
+                <option value="ot">Övertid</option>
+                <option value="so">Straffar</option>
+              </select>
             </div>
           </div>
 

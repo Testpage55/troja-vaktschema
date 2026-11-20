@@ -59,3 +59,51 @@ export function calcPayroll(start, end, deduction = MEAL_DEDUCTION_HOURS) {
     payHours: Math.max(0, grossHours - deduction),
   }
 }
+// Matchresultat ur Trojas perspektiv, t.ex. { text: '3–4 ö.t.', outcome: 'loss' }
+export function formatResult(match) {
+  if (match?.troja_goals == null || match?.opponent_goals == null) return null
+  const t = match.troja_goals, o = match.opponent_goals
+  const suffix = match.result_type === 'ot' ? ' ö.t.' : match.result_type === 'so' ? ' str.' : ''
+  const outcome = t > o ? 'win' : t < o ? 'loss' : 'draw'
+  return { text: `${t}–${o}${suffix}`, outcome, label: outcome === 'win' ? 'Vinst' : outcome === 'loss' ? 'Förlust' : 'Oavgjort' }
+}
+
+// ─── Spårbarhet för arbetstider ───────────────────────────────────────────────
+// Fälten change_status, changed_by_name, changed_at och original_* sätts av
+// databasen (trigger) och kan inte ändras från appen.
+const fmtStamp = (ts) => ts
+  ? new Date(ts).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).replace('.', '')
+  : ''
+const hm = (t) => (t ? String(t).slice(0, 5) : '')
+
+export function auditLabel(wh) {
+  if (!wh) return null
+  const who = wh.changed_by_role === 'admin' ? `${wh.changed_by_name} (admin)` : wh.changed_by_name
+  switch (wh.change_status) {
+    case 'auto':
+      return { tone: 'neutral', text: 'Automatiskt registrerad (4,5h standard)' }
+    case 'registered':
+      return { tone: 'info', text: `Registrerad av ${who || 'okänd'} ${fmtStamp(wh.changed_at)}` }
+    case 'changed': {
+      const orig = wh.original_start_time && wh.original_end_time
+        ? `${hm(wh.original_start_time)}–${hm(wh.original_end_time)}` : null
+      return {
+        tone: 'changed',
+        text: `Ändrad av ${who || 'okänd'} ${fmtStamp(wh.changed_at)}`,
+        detail: orig ? `Ursprungligen ${orig}` : null,
+      }
+    }
+    case 'restored':
+      return { tone: 'info', text: `Återställd till ursprunglig tid av ${who || 'okänd'} ${fmtStamp(wh.changed_at)}` }
+    case 'legacy':
+      return { tone: 'neutral', text: 'Registrerad före ändringsloggen' }
+    default:
+      return null
+  }
+}
+
+export const AUDIT_COLORS = {
+  neutral: { bg: '#f3f4f6', fg: '#4b5563' },
+  info: { bg: '#e0f2fe', fg: '#075985' },
+  changed: { bg: '#fef3c7', fg: '#92400e' },
+}

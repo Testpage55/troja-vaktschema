@@ -329,7 +329,7 @@ export function useAppData() {
         await supabase.from('work_hours').insert([{
           match_id: matchId, personnel_id: personnelId,
           start_time: startTime, end_time: endTime,
-          work_date: match.date, notes: 'Automatiskt registrerad (4,5h standard)'
+          work_date: match.date, notes: null
         }])
       }
     } catch (error) { console.error('Error adding automatic work hours:', error) }

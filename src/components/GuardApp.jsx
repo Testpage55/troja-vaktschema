@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import TimeInput from './TimeInput'
+import { formatResult, auditLabel, AUDIT_COLORS } from '../utils/timeUtils'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import '../guard.css'
@@ -485,6 +486,14 @@ function TimeModal({ assignment, personnelId, onClose, onSave }) {
               style={{ width:'100%', height:'48px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'16px', fontWeight:'600', padding:'0 14px', outline:'none', color:'#111827', background:'white', boxSizing:'border-box' }} />
           </div>
 
+          {/* Registrering (sätts av systemet, kan inte ändras) */}
+          {(() => { const a = auditLabel(wh); if (!a) return null; const c = AUDIT_COLORS[a.tone]; return (
+            <div style={{ background:c.bg, color:c.fg, borderRadius:'12px', padding:'10px 14px', fontSize:'13px', fontWeight:'600' }}>
+              {a.text}{a.detail && <div style={{ fontWeight:'500', marginTop:'2px' }}>{a.detail}</div>}
+              <div style={{ fontWeight:'400', fontSize:'12px', marginTop:'4px', opacity:0.85 }}>Ändrar du tiden loggas ditt namn och tidpunkten, och admin ser ändringen.</div>
+            </div>
+          ) })()}
+
           {/* Anteckningar */}
           <div>
             <div style={{ fontSize:'10px', fontWeight:'800', color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:'8px' }}>Anteckningar (valfritt)</div>
@@ -591,7 +600,7 @@ function MyHours({ personnelId, onEdit, refreshKey }) {
   const fetchHours = async () => {
     const todayStr = new Date().toISOString().split('T')[0]
     const [{ data }, { data: activeAssignments }, { data: pays }] = await Promise.all([
-      supabase.from('work_hours').select('*, matches(id,date,opponent,time,match_type,season,attendance)').eq('personnel_id', personnelId).lt('work_date', todayStr).order('work_date', { ascending: true }),
+      supabase.from('work_hours').select('*, matches(id,date,opponent,time,match_type,season,attendance,troja_goals,opponent_goals,result_type)').eq('personnel_id', personnelId).lt('work_date', todayStr).order('work_date', { ascending: true }),
       supabase.from('assignments').select('match_id').eq('personnel_id', personnelId).eq('is_working', true),
       supabase.from('payouts').select('*').order('period_end', { ascending: false }),
     ])
@@ -758,8 +767,8 @@ function MyHours({ personnelId, onEdit, refreshKey }) {
                       title={wh.payout ? 'Passet är utbetalt och kan inte ändras' : 'Ändra tider'}>
                       <span className="mh-date">{new Date(wh.work_date + 'T12:00').getDate()}/{new Date(wh.work_date + 'T12:00').getMonth() + 1}</span>
                       <span className="mh-body">
-                        <span className="mh-opp">{wh.matches?.opponent || 'Uppdrag'}</span>
-                        <span className="mh-time">{fmtTime(wh.start_time)}–{fmtTime(wh.end_time)}{wh.matches?.attendance ? `, ${wh.matches.attendance.toLocaleString('sv-SE')} åskådare` : ''}</span>
+                        <span className="mh-opp">{wh.matches?.opponent || 'Uppdrag'}{wh.change_status === 'changed' && <span className="mh-changed">Ändrad</span>}</span>
+                        <span className="mh-time">{fmtTime(wh.start_time)}–{fmtTime(wh.end_time)}{wh.matches?.attendance ? `, ${wh.matches.attendance.toLocaleString('sv-SE')} åskådare` : ''}{formatResult(wh.matches) ? `, ${formatResult(wh.matches).text}` : ''}</span>
                       </span>
                       <span className="mh-h">{fmtH(wh.h)} h</span>
                       <span className="mh-go" aria-hidden="true">{wh.payout ? '✓' : '›'}</span>
@@ -771,6 +780,100 @@ function MyHours({ personnelId, onEdit, refreshKey }) {
           </div>
           {unpaidCount > 0 && <div className="mh-hint">Tryck på ett pass för att ändra tiderna. Utbetalda pass är låsta.</div>}
         </>
+      )}
+    </div>
+  )
+}
+
+// ─── OpenShifts: ansök om att jobba ───────────────────────────────────────────
+
+function OpenShifts({ personnelId, refreshKey }) {
+  const [matches, setMatches] = useState([])
+  const [apps, setApps] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState(null)
+  const [error, setError] = useState('')
+  const [showAll, setShowAll] = useState(false)
+
+  const load = async () => {
+    const todayStr = new Date().toISOString().split('T')[0]
+    const [{ data: ms }, { data: as }] = await Promise.all([
+      supabase.from('matches').select('id,date,time,opponent,match_type,assignments(personnel_id,is_working)').gte('date', todayStr).order('date'),
+      supabase.from('match_applications').select('*').eq('personnel_id', personnelId),
+    ])
+    setMatches(ms || [])
+    setApps(as || [])
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [personnelId, refreshKey])
+
+  const appFor = (id) => apps.find(a => a.match_id === id)
+  const list = matches
+    .filter(m => !(m.assignments || []).some(a => a.personnel_id === personnelId && a.is_working))
+    .map(m => ({ ...m, app: appFor(m.id) }))
+    .filter(m => m.app?.status !== 'approved' && m.app?.status !== 'rejected') // nekade visas inte
+  const shown = showAll ? list : list.slice(0, 4)
+  const pendingCount = list.filter(m => m.app?.status === 'pending').length
+
+  const apply = async (m) => {
+    setBusyId(m.id); setError('')
+    const { error } = await supabase.from('match_applications').insert([{ match_id: m.id, personnel_id: personnelId }])
+    setBusyId(null)
+    if (error) { setError(error.message.includes('duplicate') ? 'Du har redan ansökt till matchen.' : error.message); return }
+    iceBurst(window.innerWidth / 2, window.innerHeight * 0.6, { pucks: 1 })
+    load()
+  }
+  const withdraw = async (app) => {
+    if (!window.confirm('Återta din ansökan?')) return
+    await supabase.from('match_applications').delete().eq('id', app.id)
+    load()
+  }
+
+  if (loading || list.length === 0) return null
+
+  return (
+    <div className="guard-card">
+      <div className="mh-head" style={{ marginBottom: '4px' }}>
+        <h2 className="guard-card-title" style={{ margin: 0 }}>Lediga pass</h2>
+        {pendingCount > 0 && <span className="os-pending-count">{pendingCount} väntar på svar</span>}
+      </div>
+      <div className="mh-sub" style={{ marginBottom: '12px' }}>Ansök om att jobba. Admin godkänner, och då hamnar matchen under Kommande matcher.</div>
+
+      <div className="os-list">
+        {shown.map(m => {
+          const d = new Date(m.date + 'T12:00')
+          const st = m.app?.status
+          return (
+            <div key={m.id} className="os-item">
+              <div className="os-row">
+                <div className="os-date">
+                  <span className="os-wd">{d.toLocaleDateString('sv-SE', { weekday: 'short' }).replace('.', '')}</span>
+                  <span className="os-d">{d.getDate()}</span>
+                  <span className="os-m">{d.toLocaleDateString('sv-SE', { month: 'short' }).replace('.', '')}</span>
+                </div>
+                <div className="os-body">
+                  <div className="os-opp">{m.opponent}{m.match_type === 'away' && <span className="tl-away" style={{ marginLeft: 6 }}>Borta</span>}</div>
+                  <div className="os-meta">Match {m.time || 'TBA'}</div>
+                </div>
+                <div className="os-action">
+                  {st === 'pending' ? (
+                    <button className="os-btn is-pending" onClick={() => withdraw(m.app)} title="Tryck för att återta">Väntar…</button>
+                  ) : st === 'rejected' ? (
+                    <span className="os-status is-rejected">Ej tilldelad</span>
+                  ) : (
+                    <button className="os-btn" onClick={() => apply(m)} disabled={busyId === m.id}>{busyId === m.id ? 'Skickar…' : 'Ansök'}</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {error && <div className="os-error" style={{ marginTop: '8px' }}>{error}</div>}
+      {list.length > 4 && (
+        <button className="tl-toggle" style={{ marginTop: '10px', width: '100%' }} onClick={() => setShowAll(v => !v)}>
+          {showAll ? 'Visa färre' : `Visa alla ${list.length} matcher`}
+        </button>
       )}
     </div>
   )
@@ -943,6 +1046,7 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmi
       <div className="guard-content">
         <NextMatch personnelId={personnelId} />
         <AssignedMatches assignments={assignments} onEditTimes={setEditingAssignment} personnelId={personnelId} isAdmin={isAdmin} />
+        <OpenShifts personnelId={personnelId} refreshKey={hoursRefresh} />
         <MyHours personnelId={personnelId} onEdit={setEditingAssignment} refreshKey={hoursRefresh} />
       </div>
 

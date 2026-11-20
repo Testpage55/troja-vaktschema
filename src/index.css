@@ -1156,3 +1156,17 @@ th {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
+/* ── Löneunderlagets tabell ─────────────────────────────────────── */
+.wh-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.wh-table { width: 100%; font-size: 13px; }
+.wh-table th { white-space: nowrap; }
+.wh-table td { vertical-align: middle; }
+.wh-nowrap { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wh-row-editable { cursor: pointer; }
+.wh-row-editable:hover td { background: #fef2f2; }
+.wh-audit { min-width: 200px; max-width: 260px; }
+.wh-audit-badge {
+  display: inline-block; border-radius: 6px; padding: 3px 8px;
+  font-size: 12px; font-weight: 600; line-height: 1.35; white-space: normal;
+}
+.wh-audit-detail { display: block; font-weight: 400; }

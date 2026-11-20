@@ -1564,3 +1564,33 @@ html {
   padding: 4px 10px; border-radius: 99px; border: 1px dashed #fca5a5; background: #fff;
   color: #b91c1c; font-size: 12px; font-weight: 600; cursor: pointer;
 }
+.mh-changed { margin-left: 6px; font-size: 10px; font-weight: 700; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 5px; vertical-align: 2px; }
+
+/* ── Lediga pass (ansökan) ─────────────────────────────────────── */
+.os-pending-count { font-size: 12px; font-weight: 700; background: #fef3c7; color: #92400e; padding: 3px 9px; border-radius: 99px; }
+.os-list { display: flex; flex-direction: column; }
+.os-item { border-top: 1px solid #f3f4f6; padding: 10px 0; }
+.os-item:first-child { border-top: 0; }
+.os-row { display: flex; align-items: center; gap: 12px; }
+.os-date { width: 40px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.os-wd, .os-m { font-size: 11px; color: #6b7280; }
+.os-d { font-size: 22px; font-weight: 800; color: #1f2937; }
+.os-body { flex: 1; min-width: 0; }
+.os-opp { font-size: 15px; font-weight: 700; color: #1f2937; }
+.os-meta { font-size: 12px; color: #6b7280; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+.os-spots { font-weight: 600; color: #15803d; background: #dcfce7; padding: 1px 7px; border-radius: 6px; }
+.os-spots.is-full { color: #6b7280; background: #f3f4f6; }
+.os-action { flex-shrink: 0; }
+.os-btn {
+  border: 0; background: #dc2626; color: #fff; font-weight: 700; font-size: 13px;
+  padding: 8px 14px; border-radius: 10px; cursor: pointer; touch-action: manipulation;
+}
+.os-btn.is-pending { background: #fef3c7; color: #92400e; }
+.os-btn.is-ghost { background: #fff; color: #374151; border: 1px solid #e5e7eb; }
+.os-btn:disabled { opacity: .6; }
+.os-status.is-rejected { font-size: 12px; color: #6b7280; }
+.os-form { margin: 10px 0 0 52px; display: flex; flex-direction: column; gap: 8px; }
+.os-form input { width: 100%; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid #e5e7eb; border-radius: 10px; font: inherit; font-size: 16px; }
+.os-form-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.os-error { color: #b91c1c; font-size: 13px; }
+@media (max-width: 400px) { .os-form { margin-left: 0; } }
