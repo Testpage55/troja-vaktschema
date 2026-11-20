@@ -295,7 +295,7 @@ function MatchPersonnelModal({ match, onClose, personnelId, isAdmin }) {
             <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
               <input type="number" min="0" value={attendanceInput} onChange={e => setAttendanceInput(e.target.value)}
                 placeholder="Ange publiksiffra..."
-                style={{ flex:1, padding:'8px 12px', border:'1px solid #e2e8f0', borderRadius:'10px', fontSize:'15px', outline:'none' }}
+                style={{ flex:1, minWidth:0, width:0, padding:'8px 12px', border:'1px solid #e2e8f0', borderRadius:'10px', fontSize:'16px', outline:'none' }}
                 onKeyDown={e => e.key === 'Enter' && saveAttendance()} />
               <button onClick={saveAttendance} disabled={savingAttendance || !attendanceInput}
                 style={{ padding:'8px 16px', background:'#ef4444', color:'white', border:'none', borderRadius:'10px', fontWeight:'600', fontSize:'14px', cursor:'pointer', flexShrink:0, opacity:!attendanceInput?0.5:1 }}>
@@ -461,7 +461,7 @@ function TimeModal({ assignment, personnelId, onClose, onSave }) {
               <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                 <button style={adjBtn} onClick={()=>adjustTime(which,-15)}>−</button>
                 <TimeInput value={val} onChange={e=>setter(e.target.value)}
-                  style={{ flex:1, height:'52px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'22px', fontWeight:'800', textAlign:'center', outline:'none', color:'#111827', background:'white', fontVariantNumeric:'tabular-nums' }} />
+                  style={{ flex:1, minWidth:0, width:0, height:'52px', border:'2px solid #e5e7eb', borderRadius:'14px', fontSize:'22px', fontWeight:'800', textAlign:'center', outline:'none', color:'#111827', background:'white', fontVariantNumeric:'tabular-nums' }} />
                 <button style={adjBtn} onClick={()=>adjustTime(which,15)}>+</button>
               </div>
             </div>
@@ -847,7 +847,7 @@ export default function GuardApp({ personnelId, personnelName, onSignOut, isAdmi
             <button onClick={toggleFx} className="guard-schedule-btn" title={fxOn ? 'Stäng av iseffekter' : 'Slå på iseffekter'} aria-pressed={fxOn}
               style={fxOn ? undefined : { opacity: 0.6 }}>
               <span style={{ fontSize:'18px' }}>{fxOn ? '❄️' : '🚫'}</span>
-              <span>Effekter {fxOn ? 'på' : 'av'}</span>
+              <span>Effekter</span>
             </button>
             <button className="logout-btn" onClick={onSignOut}>Logga ut</button>
           </div>

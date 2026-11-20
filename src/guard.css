@@ -1434,3 +1434,39 @@ html {
 }
 .tl-empty strong { display: block; color: #374151; margin-bottom: 4px; }
 .tl-title:focus-visible, .tl-edit:focus-visible, .tl-toggle:focus-visible { outline: 3px solid #fca5a5; outline-offset: 2px; }
+
+/* ── Mobil: inget sidledes scroll ───────────────────────────────── */
+.guard-app { overflow-x: clip; }
+.mob-modal-overlay, .mob-modal-sheet { max-width: 100vw; }
+.guard-header-actions .logout-btn {
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .guard-header { margin: 12px 12px 0; padding: 14px; }
+  .guard-content { padding: 12px; gap: 12px; }
+  .guard-header-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    grid-auto-flow: column;
+    width: 100%;
+    gap: 6px;
+  }
+  .guard-header-actions > button {
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    padding: 6px 4px;
+    font-size: 11px;
+    text-align: center;
+  }
+  .guard-header-actions .logout-btn { font-size: 12px; }
+}
+/* iOS zoomar in (och sidan kan då dras i sidled) om ett fält har mindre än 16px text */
+@media (max-width: 560px) {
+  .guard-app input:not([inputmode="numeric"]), .guard-app textarea, .guard-app select,
+  .mob-modal-sheet input:not([inputmode="numeric"]), .mob-modal-sheet textarea, .mob-modal-sheet select { font-size: 16px !important; }
+}
