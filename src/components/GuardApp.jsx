@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import '../guard.css'
 import { downloadIcs } from '../utils/icalExport'
-import { mountIceSnow, iceBurst, effectsEnabled, setEffectsEnabled, EFFECTS_EVENT } from '../effects/iceEffects'
+import { iceBurst, effectsEnabled, setEffectsEnabled, EFFECTS_EVENT } from '../effects/iceEffects'
+import HockeyBannerEffects from './HockeyBannerEffects'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -75,21 +76,25 @@ function NextMatch({ personnelId }) {
   const [next, setNext] = useState(null)
   const [countdown, setCountdown] = useState(null)
   const [loading, setLoading] = useState(true)
-  const bannerRef = useRef(null)
+  const fxRef = useRef(null)
+  const wasLive = useRef(null)
 
   useEffect(() => { fetchNext() }, [personnelId])
 
-  // Iskristaller i bannern (PixiJS)
+  // Hockey-effekter i bannern (PixiJS) – slås av/på med knappen i headern
   const [fxOn, setFxOn] = useState(effectsEnabled())
   useEffect(() => {
     const h = (e) => setFxOn(e.detail)
     window.addEventListener(EFFECTS_EVENT, h)
     return () => window.removeEventListener(EFFECTS_EVENT, h)
   }, [])
+
+  // Fyrverkeri när nedräkningen når 00:00:00
   useEffect(() => {
-    if (!next || !fxOn || !bannerRef.current) return
-    return mountIceSnow(bannerRef.current)
-  }, [next, fxOn])
+    const live = !!countdown?.live
+    if (live && wasLive.current === false) fxRef.current?.celebrate()
+    if (countdown) wasLive.current = live
+  }, [countdown])
 
   useEffect(() => {
     if (!next) return
@@ -155,11 +160,8 @@ function NextMatch({ personnelId }) {
   return (
     <div className="guard-card">
       <h2 className="guard-card-title">Kommande arbetspass</h2>
-      <div
-        className="next-match-banner"
-        ref={bannerRef}
-        onClick={e => iceBurst(e.clientX, e.clientY, { pucks: 1 })}
-      >
+      <div className={`next-match-banner${fxOn ? ' has-fx' : ''}`}>
+        {fxOn && <HockeyBannerEffects ref={fxRef} intensity={0.7} respectReducedMotion={false} />}
         <div className="next-match-title">
           IF Troja-Ljungby – {next.match.opponent}
         </div>

@@ -1296,16 +1296,28 @@ html {
   .cd-sep { line-height: 50px; padding: 0 4px; }
 }
 
-/* ── Iseffekt i bannern (PixiJS-canvas ligger bakom innehållet) ── */
+/* ── Hockey-effekter i bannern (PixiJS) ─────────────────────────────
+   Effektlagret (z-index 1) ligger bakom texten (z-index 2). Texten släpper
+   igenom klick så att pekaren når effekterna, och går inte att markera.  */
 .next-match-banner {
   position: relative;
   overflow: hidden;
-  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.next-match-banner > :not(canvas) {
-  position: relative;
+.hbe-host {
+  position: absolute;
+  inset: 0;
   z-index: 1;
+  touch-action: pan-y;
+}
+.next-match-banner > :not(.hbe-host) {
+  position: relative;
+  z-index: 2;
+}
+.next-match-banner.has-fx > :not(.hbe-host) {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ── Kommande matcher: tidslinje ───────────────────────────────── */
