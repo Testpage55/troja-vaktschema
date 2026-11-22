@@ -33,6 +33,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
   const [customSeason, setCustomSeason] = useState('')
   const [attendance, setAttendance] = useState('')
   const [policeContact, setPoliceContact] = useState('')
+  const [applicationsClosed, setApplicationsClosed] = useState(false)
   const [noMealDeduction, setNoMealDeduction] = useState(false)
   const [trojaGoals, setTrojaGoals] = useState('')
   const [opponentGoals, setOpponentGoals] = useState('')
@@ -58,6 +59,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       setAttendance(match.attendance ? String(match.attendance) : '')
       setPoliceContact(match.police_contact || '')
       setNoMealDeduction(!!match.no_meal_deduction)
+      setApplicationsClosed(!!match.applications_closed)
       setTrojaGoals(match.troja_goals == null ? '' : String(match.troja_goals))
       setOpponentGoals(match.opponent_goals == null ? '' : String(match.opponent_goals))
       setResultType(match.result_type || '')
@@ -88,6 +90,7 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
       attendance: attendance ? parseInt(attendance) : null,
       police_contact: policeContact.trim() || null,
       no_meal_deduction: noMealDeduction,
+      applications_closed: applicationsClosed,
       troja_goals: trojaGoals === '' ? null : parseInt(trojaGoals),
       opponent_goals: opponentGoals === '' ? null : parseInt(opponentGoals),
       result_type: (trojaGoals === '' || opponentGoals === '') ? null : (resultType || null),
@@ -210,6 +213,11 @@ export default function EditMatchModal({ isOpen, onClose, onSave, match, availab
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }} title="Gäller alla vakter på matchen i löneunderlaget">
             <input type="checkbox" checked={noMealDeduction} onChange={e => setNoMealDeduction(e.target.checked)} />
             Inget matavdrag på den här matchen
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }} title="Vakterna ser inte matchen under Lediga pass och kan inte ansöka">
+            <input type="checkbox" checked={applicationsClosed} onChange={e => setApplicationsClosed(e.target.checked)} />
+            Inte öppen för ansökan
           </label>
         </div>
 

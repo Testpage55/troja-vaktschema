@@ -798,7 +798,7 @@ function OpenShifts({ personnelId, refreshKey }) {
   const load = async () => {
     const todayStr = new Date().toISOString().split('T')[0]
     const [{ data: ms }, { data: as }] = await Promise.all([
-      supabase.from('matches').select('id,date,time,opponent,match_type,assignments(personnel_id,is_working)').gte('date', todayStr).order('date'),
+      supabase.from('matches').select('id,date,time,opponent,match_type,applications_closed,assignments(personnel_id,is_working)').gte('date', todayStr).order('date'),
       supabase.from('match_applications').select('*').eq('personnel_id', personnelId),
     ])
     setMatches(ms || [])
@@ -810,6 +810,7 @@ function OpenShifts({ personnelId, refreshKey }) {
   const appFor = (id) => apps.find(a => a.match_id === id)
   const list = matches
     .filter(m => !(m.assignments || []).some(a => a.personnel_id === personnelId && a.is_working))
+    .filter(m => !m.applications_closed)
     .map(m => ({ ...m, app: appFor(m.id) }))
     .filter(m => m.app?.status !== 'approved' && m.app?.status !== 'rejected') // nekade visas inte
   const shown = showAll ? list : list.slice(0, 4)

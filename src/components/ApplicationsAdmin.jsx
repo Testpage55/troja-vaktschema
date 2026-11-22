@@ -183,3 +183,44 @@ export function MatchApplicationsSection({ matchId, onChanged }) {
     </div>
   )
 }
+
+/** Under varje matchkort: ansökningar för matchen, går att fälla ihop. */
+export function MatchCardApplications({ apps, onChanged, shiftsByPerson = {}, season }) {
+  const pendingCount = apps.filter(a => a.status === 'pending').length
+  const [open, setOpen] = useState(pendingCount > 0)
+  const [touched, setTouched] = useState(false)
+  // Öppna automatiskt när en ny ansökan dyker upp, om admin inte själv valt
+  useEffect(() => { if (!touched) setOpen(pendingCount > 0) }, [pendingCount, touched])
+  if (apps.length === 0) return null
+  const label = { approved: 'Godkänd', rejected: 'Nekad' }
+  const color = { approved: ['#dcfce7', '#166534'], rejected: ['#f3f4f6', '#4b5563'] }
+  const sorted = [...apps].sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1))
+  return (
+    <div style={{ marginTop: '6px', border: '1px solid var(--gray-200)', borderRadius: '10px', background: 'white', overflow: 'hidden' }}>
+      <button onClick={() => { setTouched(true); setOpen(v => !v) }} aria-expanded={open}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: pendingCount ? '#fef2f2' : 'var(--gray-50)', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 700, textAlign: 'left' }}>
+        <span style={{ display: 'inline-block', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .15s', fontSize: '11px' }}>▶</span>
+        <span>Ansökningar ({apps.length})</span>
+        {pendingCount > 0 && (
+          <span style={{ marginLeft: 'auto', background: '#dc2626', color: 'white', borderRadius: '99px', padding: '1px 9px', fontSize: '12px' }}>{pendingCount} väntar</span>
+        )}
+      </button>
+      {open && sorted.map(a => (
+        <div key={a.id} style={{ padding: '8px 10px', borderTop: '1px solid var(--gray-100)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ fontSize: '13px', minWidth: 0 }}>
+            <strong>{a.personnel?.name}</strong>{' '}
+            {a.status !== 'pending' && (
+              <span style={{ fontSize: '11px', fontWeight: 700, padding: '1px 7px', borderRadius: '6px', background: color[a.status][0], color: color[a.status][1] }}>{label[a.status]}</span>
+            )}
+            <div style={{ color: 'var(--gray-500)', fontSize: '11px' }}>
+              {a.status === 'pending'
+                ? `ansökte ${fmtAgo(a.created_at)} · ${shiftsByPerson[`${a.personnel_id}|${season}`] || 0} pass i säsongen`
+                : a.decided_by_name ? `av ${a.decided_by_name} ${fmtAgo(a.decided_at)}` : ''}
+            </div>
+          </div>
+          {a.status === 'pending' ? <DecisionButtons app={a} onDone={onChanged} compact /> : <div><DeleteButton app={a} /></div>}
+        </div>
+      ))}
+    </div>
+  )
+}

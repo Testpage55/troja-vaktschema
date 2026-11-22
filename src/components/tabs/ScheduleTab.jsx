@@ -3,7 +3,7 @@ import TimeInput from '../TimeInput'
 import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { SECURITY_RESPONSIBLE, isRegularGuard } from '../../constants'
 import EditMatchModal from '../modals/EditMatchModal'
-import { PendingApplicationsPanel, MatchApplicationsSection } from '../ApplicationsAdmin'
+import { MatchApplicationsSection, MatchCardApplications, useApplications } from '../ApplicationsAdmin'
 import { supabase } from '../../lib/supabase'
 import { calculateWorkTimes, formatResult } from '../../utils/timeUtils'
 
@@ -474,6 +474,12 @@ function MatchDetailPanel({ match, allPersonnel, isWorking, hasWorkHours, getWor
           {/* Ansökningar */}
           <MatchApplicationsSection matchId={match.id} onChanged={onApplicationsChanged} />
 
+          {match.applications_closed && (
+            <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#f3f4f6', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', fontWeight: '600', color: '#374151' }}>
+              🔒 Inte öppen för ansökan
+            </div>
+          )}
+
           {/* Inget matavdrag */}
           {match.no_meal_deduction && (
             <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a', fontSize: '14px', fontWeight: '600', color: '#92400e' }}>
@@ -751,6 +757,12 @@ export default function ScheduleTab({
   saving, currentPersonnelId, matchExtraCounts = {}, onExtrasChanged, onApplicationsChanged
 }) {
   const [selectedMatchId, setSelectedMatchId] = useState(null)
+  const { apps: allApps } = useApplications()
+  const appsByMatch = allApps.reduce((acc, a) => { (acc[a.match_id] ??= []).push(a); return acc }, {})
+  const shiftsByPerson = matches.reduce((acc, m) => {
+    (m.assignments || []).filter(x => x.is_working).forEach(x => { const k = `${x.personnel_id}|${m.season}`; acc[k] = (acc[k] || 0) + 1 })
+    return acc
+  }, {})
   const selectedMatch = matches.find(m => m.id === selectedMatchId) || null
   const setSelectedMatch = (m) => setSelectedMatchId(m ? m.id : null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -793,14 +805,6 @@ export default function ScheduleTab({
         )}
       </div>
 
-      <PendingApplicationsPanel
-        onChanged={onApplicationsChanged}
-        getWorkingCount={(id) => { const m = matches.find(x => x.id === id); return m ? getWorkingCount(m) : null }}
-        shiftsByPerson={matches.reduce((acc, m) => {
-          (m.assignments || []).filter(a => a.is_working).forEach(a => { const k = `${a.personnel_id}|${m.season}`; acc[k] = (acc[k] || 0) + 1 })
-          return acc
-        }, {})}
-      />
 
       {monthGroups.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--gray-500)' }}>
@@ -822,6 +826,7 @@ export default function ScheduleTab({
                   <button key={g.monthKey} onClick={() => setActiveMonth(g.monthKey)}
                     style={{ padding: '5px 12px', borderRadius: '99px', whiteSpace: 'nowrap', border: isActive ? 'none' : '1px solid var(--gray-200)', background: isActive ? '#16a34a' : 'white', color: isActive ? 'white' : hasFuture ? 'var(--gray-800)' : 'var(--gray-400)', fontWeight: isActive ? '600' : '400', fontSize: '13px', cursor: 'pointer' }}>
                     {g.monthName}
+                    {(() => { const n = g.matches.reduce((t, m) => t + (appsByMatch[m.id] || []).filter(x => x.status === 'pending').length, 0); return n > 0 ? <span style={{ marginLeft: '6px', background: '#dc2626', color: 'white', borderRadius: '99px', padding: '0 6px', fontSize: '11px', fontWeight: 700 }}>{n}</span> : null })()}
                   </button>
                 )
               })}
@@ -833,8 +838,8 @@ export default function ScheduleTab({
           {activeGroup && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
               {activeGroup.matches.map(match => (
+                <div key={match.id} style={{ minWidth: 0 }}>
                 <MatchCard
-                  key={match.id}
                   match={match}
                   allPersonnel={allPersonnel}
                   isWorking={isWorking}
@@ -845,6 +850,8 @@ export default function ScheduleTab({
                   extras={matchExtraCounts[match.id]}
                   onClick={() => setSelectedMatch(match)}
                 />
+                <MatchCardApplications apps={appsByMatch[match.id] || []} onChanged={onApplicationsChanged} shiftsByPerson={shiftsByPerson} season={match.season} />
+                </div>
               ))}
             </div>
           )}
