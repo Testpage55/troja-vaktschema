@@ -77,7 +77,7 @@ function DecisionButtons({ app, onDone, compact }) {
 }
 
 /** Panel överst i Schema: alla väntande ansökningar. */
-export function PendingApplicationsPanel({ onChanged, shiftsByPerson = {}, getWorkingCount }) {
+export function PendingApplicationsPanel({ onChanged, shiftsByPerson = {}, getWorkingCount, flat }) {
   const { apps } = useApplications()
   const [showDecided, setShowDecided] = useState(false)
   const todayStr = new Date().toISOString().split('T')[0]
@@ -91,7 +91,7 @@ export function PendingApplicationsPanel({ onChanged, shiftsByPerson = {}, getWo
   const groups = Object.values(byMatch).sort((x, y) => x[0].matches.date.localeCompare(y[0].matches.date))
 
   return (
-    <div style={{ background: 'white', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px', boxShadow: 'var(--shadow-sm)', borderLeft: '0' }}>
+    <div style={flat ? {} : { background: 'white', borderRadius: '10px', padding: '16px 20px', marginBottom: '16px', boxShadow: 'var(--shadow-sm)', borderLeft: '0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: pending.length ? '10px' : 0, flexWrap: 'wrap' }}>
         {pending.length > 0 ? (
           <>

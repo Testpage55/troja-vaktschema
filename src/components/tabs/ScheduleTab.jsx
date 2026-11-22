@@ -4,6 +4,7 @@ import { useModalBackButton } from '../../hooks/useModalBackButton'
 import { SECURITY_RESPONSIBLE, isRegularGuard } from '../../constants'
 import EditMatchModal from '../modals/EditMatchModal'
 import { MatchApplicationsSection, MatchCardApplications, useApplications } from '../ApplicationsAdmin'
+import ApplicationsHub from '../ApplicationsHub'
 import { supabase } from '../../lib/supabase'
 import { calculateWorkTimes, formatResult } from '../../utils/timeUtils'
 
@@ -805,6 +806,8 @@ export default function ScheduleTab({
         )}
       </div>
 
+
+      <ApplicationsHub apps={allApps} matches={matches} getWorkingCount={getWorkingCount} shiftsByPerson={shiftsByPerson} onChanged={onApplicationsChanged} />
 
       {monthGroups.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--gray-500)' }}>
